@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: timeoff
+      POSTGRES_USER: timeoff
+      POSTGRES_PASSWORD: timeoff
+      TZ: Europe/Zagreb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U timeoff -d timeoff"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:
