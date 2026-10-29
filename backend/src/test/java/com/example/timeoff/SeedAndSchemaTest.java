@@ -6,9 +6,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.timeoff.domain.Team;
 import com.example.timeoff.domain.TeamRepository;
+import com.example.timeoff.domain.TimeOffRequest;
 import com.example.timeoff.domain.TimeOffRequestRepository;
+import com.example.timeoff.domain.TimeOffType;
 import com.example.timeoff.domain.User;
 import com.example.timeoff.domain.UserRepository;
+import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -38,6 +42,9 @@ class SeedAndSchemaTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Test
     void seedHasEightUsers_T1() {
@@ -100,7 +107,45 @@ class SeedAndSchemaTest {
     @Test
     void allUsersHavePasswordHashOfPassword_D16() {
         assertThat(userRepository.findAll())
-            .allSatisfy(u -> assertThat(ENCODER.matches("password", u.getPasswordHash())).isTrue());
+            .allSatisfy(u -> {
+                boolean matches = ENCODER.matches("password", u.getPasswordHash());
+                assertThat(matches).isTrue();
+            });
+    }
+
+    @Test
+    void leadIsRecognisedWhenLoadedSeparately_T1() {
+        Team platform = detachedTeam("Platform");
+
+        assertThat(user("ana").leads(platform)).isTrue();
+        assertThat(user("luka").leads(platform)).isFalse();
+    }
+
+    @Test
+    void memberIsRecognisedWhenLoadedSeparately_T1() {
+        Team platform = detachedTeam("Platform");
+
+        assertThat(user("ivan").isMemberOf(platform)).isTrue();
+        assertThat(user("sara").isMemberOf(platform)).isFalse();
+    }
+
+    @Test
+    void ownerIsRecognisedWhenLoadedSeparately_Q29() {
+        TimeOffRequest request = new TimeOffRequest(
+            user("ivan"),
+            TimeOffType.VACATION,
+            LocalDate.of(2026, 11, 2),
+            LocalDate.of(2026, 11, 6),
+            null,
+            Instant.parse("2026-10-01T08:00:00Z"));
+        requestRepository.save(request);
+        entityManager.flush();
+        entityManager.clear();
+        User ivan = user("ivan");
+        User ana = user("ana");
+
+        assertThat(request.isSubmittedBy(ivan)).isTrue();
+        assertThat(request.isSubmittedBy(ana)).isFalse();
     }
 
     @Test
@@ -212,6 +257,15 @@ class SeedAndSchemaTest {
             .filter(t -> t.getName().equals(name))
             .findFirst()
             .orElseThrow();
+    }
+
+    private Team detachedTeam(String name) {
+        Team team = team(name);
+        // load lazy fields before detaching, so later users are separate objects
+        team.getLead().getUsername();
+        team.getMembers().size();
+        entityManager.clear();
+        return team;
     }
 
     private List<String> memberNames(String teamName) {

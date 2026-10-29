@@ -16,11 +16,11 @@ Cjelina se može razbiti na manje taskove kad krene rad.
 | # | Cjelina | Slojevi ([arhitektura](arhitektura.md)) | Stanje |
 | --- | --- | --- | --- |
 | T1 | Shema i seed | 5 Domena, 6 Repozitorij, 7 Baza | gotovo |
-| T2 | Login (JWT) | 2 Security, 3 API | čeka |
+| T2 | Login (JWT) | 2 Security, 3 API | gotovo |
 | T3 | Radni dani i saldo | 3 API, 4 Servisi | čeka |
 | T4 | Kreiranje zahtjeva i validacija | 3 API, 4 Servisi | čeka |
 | T5 | Odobravanje i odbijanje | 3 API, 4 Servisi | čeka |
 | T6 | Otkazivanje | 3 API, 4 Servisi | čeka |
 | T7 | Vidljivost i kalendar | 3 API, 4 Servisi | čeka |
 | T8 | Frontend, 3 ekrana | 1 Frontend | čeka |
-| T9 | Docker i README | | čeka |
+| T9 | Docker i README; backend u Composeu dobiva `JWT_SECRET` iz `.env` (u `.gitignore`, uz `.env.example`), bez zadane šifre (L14) | | čeka |

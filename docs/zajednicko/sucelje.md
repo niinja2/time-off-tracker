@@ -101,3 +101,57 @@ Ostali upiti dodaju se u taskovima koji ih trebaju.
 - `approve`, `reject`, `cancel`: novo stanje, upisana polja, iznimka iz završnog stanja.
 - `overlaps`: dodir na rubu je preklapanje.
 - Baza odbija `end_date < start_date`, nepoznat `type` i `status`, zahtjev bez vlasnika.
+
+## T2 Login (JWT)
+
+Slojevi: 2 Security, 3 API (arhitektura). Paketi: `com.example.timeoff.security` za token i filter, `com.example.timeoff.api` za controllere i greške.
+
+### Endpointi
+
+| Metoda i put | Prijava | Tijelo | Odgovor |
+| --- | --- | --- | --- |
+| `POST /api/auth/login` | ne treba | `{ "username": "ana", "password": "password" }` | 200 `{ "token": "<JWT>", "user": <Me> }` |
+| `GET /api/me` | `Authorization: Bearer <JWT>` | nema | 200 `<Me>` |
+
+`<Me>`: `{ "id": 1, "username": "ana", "name": "Ana", "admin": false, "teamLead": true }`. `teamLead` je `true` ako korisnik vodi barem jedan tim (Q2: korisnik može imati više uloga).
+
+Sve ostale rute pod `/api/**` traže token. Bez prijave je dostupan još samo `GET /actuator/health`.
+
+### Greške
+
+Sve greške su `application/problem+json` (D11: format grešaka `application/problem+json`), s poljima `status`, `title` i `detail`.
+
+| Slučaj | Status | `detail` |
+| --- | --- | --- |
+| Login bez `username` ili `password`, ili prazan | 400 | koje polje nedostaje |
+| Login s nepostojećim korisnikom ili krivom lozinkom | 401 | `Invalid username or password` (isto za oba slučaja) |
+| Ruta pod `/api/**` bez zaglavlja `Authorization` | 401 | `Authentication required` |
+| Token s krivim potpisom, istekao ili neispravan | 401 | `Invalid or expired token` |
+| Token ispravan, ali korisnik iz `sub` više ne postoji u bazi | 401 | `Invalid or expired token` |
+
+### Token
+
+| Svojstvo | Vrijednost |
+| --- | --- |
+| Algoritam | HS256 |
+| Ključ | svojstvo `app.jwt.secret` (varijabla `JWT_SECRET`), najmanje 32 bajta; za lokalni rad i testove ima default u `application.properties`. HMAC ključ su bajtovi tog teksta u UTF-8, bez Base64 dekodiranja |
+| Trajanje | svojstvo `app.jwt.ttl`, default `PT8H` |
+| Claimovi | `sub` = id korisnika (kao tekst), `username`, `iat`, `exp` |
+
+- Token nosi samo tko si. Uloge i timovi se čitaju iz baze kod svakog poziva, pa izmjena izravno u bazi (D6: korekcije se rade izravno u bazi) vrijedi odmah, bez nove prijave.
+- Odjava ne postoji na serveru: frontend zaboravi token.
+- Lozinka se provjerava s `BCryptPasswordEncoder` (D16: lozinka `password` za sve).
+
+### Za sljedeće taskove
+
+- Controller id trenutnog korisnika (`sub` iz tokena) dobiva preko komponente `CurrentUser` s metodom `id()`, koja vraća `Long`. Servis prima taj id i sam učita `User` iz `UserRepository` u svojoj transakciji (L12, točka 1). Servisi ne primaju token.
+- Iznimke servisa API pretvara u statuse iz specifikacije (odjeljak 8): `InvalidStatusTransitionException` u 409. Ostale iznimke dodaju taskovi koji ih trebaju.
+
+### Što testovi mogu provjeriti
+
+- Login za svakog od 8 seedanih korisnika s `password` vraća 200, token i ispravan `<Me>` (Ana i Luka `teamLead: true`, Eva `admin: true`, ostali oboje `false`).
+- Login s krivom lozinkom i s nepostojećim korisnikom: 401, isti `detail`.
+- Login bez polja ili s praznim poljem: 400.
+- `GET /api/me` s tokenom iz logina vraća tog korisnika.
+- `GET /api/me` bez tokena, s tokenom krivog potpisa i s isteklim tokenom: 401, `application/problem+json`. Testovi mogu sami potpisati token ključem iz `app.jwt.secret` (npr. Nimbus `MACSigner`, već je na classpathu preko `spring-boot-starter-security-oauth2-resource-server`).
+- Token jednog korisnika ne daje identitet drugoga: Ivanov token na `GET /api/me` vraća Ivana.

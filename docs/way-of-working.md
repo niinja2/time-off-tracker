@@ -59,10 +59,13 @@ Način rada:
 - Radiš samo zadani task i samo njegove slojeve.
 - Svaki task ima dva koraka, svaki tek kad ti kažem:
   1. Sučelje: opišeš ga u docs/zajednicko/sucelje.md (odjeljak za task), bez koda.
-  2. Kod: napišeš kod, pokreneš ./mvnw test, popraviš što padne, ponavljaš dok sve ne prođe.
-     Testove ne mijenjaš. Ako misliš da je test kriv, stani i upiši unos u docs/zajednicko/coding-log.md.
+  2. Kod: pišeš iz specifikacije i sučelja. Ne čitaš kod testova.
+     Pokreneš ./mvnw test. Kad test padne, gledaš samo ispis (ime testa, očekivano, dobiveno).
+     Popraviš i ponavljaš dok sve ne prođe. Testove ne mijenjaš.
+     Ako misliš da je test kriv, stani i upiši unos u docs/zajednicko/coding-log.md.
 - Ako je specifikacija nejasna, ne odlučuj sam: upiši unos u docs/zajednicko/coding-log.md, s oznakom (R, Q, D).
 - Ne commitaš.
+- Primjedbe prvo pokušaj objasniti u plain language.
 
 Kad pročitaš, odgovori samo "Spreman".
 ```
@@ -81,6 +84,7 @@ Testove pišeš samo iz docs/zajednicko/specifikacija.md i docs/zajednicko/sucel
 Ime testa kaže pravilo, npr. lukaCannotApproveIvansRequest_R1.
 Pitanja i prigovore (i prema developeru) upisuješ kao novi unos na dno docs/zajednicko/coding-log.md,
 po formatu iz tog fajla, stanje "otvoreno". Ne razgovaraš s developerom izravno. Ne commitaš.
+Primjedbe prvo pokušaj objasniti u plain language.
 
 Na kraju vrati: tablicu oznaka → testovi, i pitanja.
 
@@ -111,6 +115,7 @@ Svaki nalaz upisuješ kao novi unos na dno coding loga, po formatu, s težinom:
 Sitnice i stil po ukusu ne upisuješ.
 
 Ne mijenjaš kod i ne commitaš.
+Primjedbe prvo pokušaj objasniti u plain language.
 
 Kad pročitaš, odgovori samo "Spreman".
 ```

@@ -75,7 +75,7 @@ public class TimeOffRequest {
     }
 
     public boolean isSubmittedBy(User user) {
-        return owner == user;
+        return owner.isSameAs(user);
     }
 
     public boolean isPending() {

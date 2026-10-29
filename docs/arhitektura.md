@@ -54,11 +54,11 @@ Uz to Docker Compose pokreće frontend, backend i bazu jednom naredbom.
 │   └───────────────┬──────────────────┘       │
 │                   │ da                       │
 │   ┌───────────────▼──────────────────┐       │
-│   │ 2.3 izvuci iz tokena:            │       │
-│   │ id, uloga, tim                   │       │
+│   │ 2.3 iz tokena: tko si (id)       │       │
+│   │ uloge i timovi iz baze (L9)      │       │
 │   └───────────────┬──────────────────┘       │
 └───────────────────┼──────────────────────────┘
-                    │ "ovo je Ana, voditeljica, Platform"
+                    │ "ovo je Ana" (uloge i timovi iz baze)
                     ▼
 ┌─────────────────────────────────────────────┐
 │ 3. API (controlleri)                         │

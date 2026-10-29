@@ -58,11 +58,25 @@ public class User {
     }
 
     public boolean leads(Team team) {
-        return team.getLead() == this;
+        return isSameAs(team.getLead());
     }
 
     public boolean isMemberOf(Team team) {
-        return teams.contains(team);
+        return team.getMembers()
+                .stream()
+                .anyMatch(member -> member.isSameAs(this));
+    }
+
+    // Same object, or both saved with the same id (L13); unsaved users never match each other.
+    boolean isSameAs(User other) {
+        if (this == other) {
+            return true;
+        }
+
+        Long otherId = other.getId();
+        boolean bothSaved = id != null && otherId != null;
+
+        return bothSaved && id.equals(otherId);
     }
 
     public boolean isTeamLead() {

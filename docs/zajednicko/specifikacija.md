@@ -169,7 +169,7 @@ Kolega ih je opisao u odgovorima, ali ih ne radimo u POC-u. Opisujemo ih u READM
 | <a id="d7"></a>🟪 `D7` | 80/20: prvo pravila iz briefa s testovima, na strukturi u koju se proširenja lako dodaju. Proširenja iz odgovora kolege ne radimo, nego ih opisujemo u README-u | [🟦 `brief`](brief.md): "a smaller app with solid rules and tests than a large app with gaps". Kolega na [🟩 `Q53.3`](atomarna-pitanja.md#q53-3) nije dao odgovor ("?"), pa smo odlučili sami |
 | <a id="d8"></a>🟪 `D8` | Vremenska zona se postavlja varijablom `TZ`, u `docker-compose` Europe/Zagreb | [🟩 `Q24`](atomarna-pitanja.md#q24); kontejner je inače u UTC-u |
 | <a id="d9"></a>🟪 `D9` | Seed bez demo zahtjeva | [🟩 `Q55`](atomarna-pitanja.md#q55); bitno je da aplikacija radi |
-| <a id="d10"></a>🟪 `D10` | Ekran prijave ima popis seedanih korisnika za brzi odabir | [🟦 `brief`](brief.md): "a simple way to act as each one" |
+| <a id="d10"></a>🟪 `D10` | Ekran prijave je forma: korisnik upisuje korisničko ime i lozinku, bez popisa korisnika | [🟦 `brief`](brief.md): "A login form with seeded passwords works". Popis bi trebao javni endpoint ili drugi izvor istine u frontendu; korisnička imena su u README-u (L10) |
 | <a id="d11"></a>🟪 `D11` | Format grešaka `application/problem+json` | [🟩 `Q50`](atomarna-pitanja.md#q50), po volji |
 | <a id="d12"></a>🟪 `D12` | Voditelj s više timova ima jedan kalendar s filtrom po timu | [🟩 `Q3`](atomarna-pitanja.md#q3) |
 | <a id="d13"></a>🟪 `D13` | Zahtjev bilježi vrijeme stvaranja, odluke i otkazivanja | Uz "tko je odlučio" i "tko je otkazao" ([🟩 `Q46`](atomarna-pitanja.md#q46), [🟩 `Q30`](atomarna-pitanja.md#q30), [🟩 `Q31`](atomarna-pitanja.md#q31)) zna se i kada |

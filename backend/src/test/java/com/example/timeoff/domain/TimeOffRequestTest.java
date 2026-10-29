@@ -61,6 +61,18 @@ class TimeOffRequestTest {
     }
 
     @Test
+    void unsavedCopyOfOwnerIsNotSubmitter_T1() {
+        User copyOfIvan = new User(
+            "ivan",
+            "Ivan",
+            "hash",
+            false,
+            LocalDate.of(2020, 1, 1));
+
+        assertThat(pendingRequest().isSubmittedBy(copyOfIvan)).isFalse();
+    }
+
+    @Test
     void approvePendingSetsDecisionFields_R4() {
         TimeOffRequest request = pendingRequest();
 
