@@ -155,3 +155,63 @@ Sve greške su `application/problem+json` (D11: format grešaka `application/pro
 - `GET /api/me` s tokenom iz logina vraća tog korisnika.
 - `GET /api/me` bez tokena, s tokenom krivog potpisa i s isteklim tokenom: 401, `application/problem+json`. Testovi mogu sami potpisati token ključem iz `app.jwt.secret` (npr. Nimbus `MACSigner`, već je na classpathu preko `spring-boot-starter-security-oauth2-resource-server`).
 - Token jednog korisnika ne daje identitet drugoga: Ivanov token na `GET /api/me` vraća Ivana.
+
+## T3 Radni dani i saldo
+
+Slojevi: 3 API, 4 Servisi (arhitektura). Paket: `com.example.timeoff.service` za servise; controller u `com.example.timeoff.api`.
+
+### Radni dani
+
+`WorkingDays` (Spring komponenta):
+
+| Metoda | Vraća | Pravilo |
+| --- | --- | --- |
+| `isWorkingDay(LocalDate date)` | `boolean` | ponedjeljak–petak su radni dani, subota i nedjelja nisu (R10: broje se samo radni dani) |
+| `count(LocalDate start, LocalDate end)` | `int` | broj radnih dana od `start` do `end`, oba uključiva; 0 ako u rasponu nema radnog dana |
+
+- Blagdani se ne preskaču (D1: blagdani su proširenje). Kad se dodaju, mijenja se samo `isWorkingDay`.
+- `count` ne provjerava redoslijed datuma. Da `end` nije prije `start` (R8), provjerava kreiranje zahtjeva u T4.
+
+### Saldo
+
+`BalanceService` (Spring servis):
+
+| Metoda | Vraća | Pravilo |
+| --- | --- | --- |
+| `entitlement(LocalDate hireDate, int year)` | `int` | 0 za godine prije godine zaposlenja; u godini zaposlenja 20 × broj mjeseci / 12, zaokruženo prema gore, mjeseci od mjeseca zaposlenja do prosinca uključivo (Q15, D5); inače 20 (R11) |
+| `balance(Long userId, int year)` | `Balance` | saldo korisnika za tu godinu; učita korisnika i njegove zahtjeve u svojoj transakciji |
+
+`Balance` (record u paketu `com.example.timeoff.service`): `year`, `entitlement`, `used`, `pending`, `remaining`, svi `int`, tim redom u konstruktoru.
+
+| Polje | Značenje |
+| --- | --- |
+| `entitlement` | dani koje korisnik dobiva te godine, iz `entitlement(hireDate, year)` |
+| `used` | zbroj radnih dana odobrenih (`APPROVED`) zahtjeva tipa `VACATION` te godine |
+| `pending` | zbroj radnih dana zahtjeva tipa `VACATION` na čekanju (`PENDING`) te godine |
+| `remaining` | `entitlement - used - pending` (R13: zahtjevi na čekanju troše saldo) |
+
+- Zahtjev pripada godini svog početnog datuma; zahtjev je unutar jedne godine (specifikacija, odjeljak 5).
+- `SICK_LEAVE` i `DAY_OFF` ne ulaze u saldo (R14). `REJECTED` i `CANCELLED` ne ulaze ni u `used` ni u `pending`.
+- `remaining` može biti negativan ako je stanje izmijenjeno izravno u bazi (D6); ne zaokružuje se na 0.
+- Provjeru "zahtjev ne smije premašiti `remaining`" (R13) radi kreiranje zahtjeva u T4.
+
+### Današnji datum
+
+Tekuća godina i "danas" čitaju se iz Spring beana `java.time.Clock`, u zoni iz `TZ` (D8: vremenska zona Europe/Zagreb). Datum se računa u zoni sata (`LocalDate.now(clock)`), ne u zoni računala: 31. 12. u 23:30 UTC je u Zagrebu već 1. 1., pa je tekuća godina sljedeća. Testovi ga mogu zamijeniti fiksnim satom (npr. `Clock.fixed(...)` u `@TestConfiguration` s `@Primary`). Isti sat koriste T4–T7 (npr. je li zahtjev počeo, Q23).
+
+### Endpoint
+
+| Metoda i put | Prijava | Odgovor |
+| --- | --- | --- |
+| `GET /api/me/balance` | `Authorization: Bearer <JWT>` | 200 `{ "year": 2026, "entitlement": 20, "used": 0, "pending": 0, "remaining": 20 }` |
+
+- Vraća saldo prijavljenog korisnika za tekuću godinu (R12: korisnik vidi iskorištene, na čekanju i preostale dane tekuće godine).
+- Bez tokena: 401, kao u T2.
+- Saldo drugih korisnika (voditelj za članove svojih timova, admin za sve, Q16, Q17) dolazi u T7 (Vidljivost).
+
+### Što testovi mogu provjeriti
+
+- `WorkingDays.count`: tjedan od ponedjeljka do petka je 5; od petka do ponedjeljka je 2; samo subota i nedjelja je 0; jedan radni dan je 1.
+- `entitlement`: zaposlen 2020-01-01, godina 2026: 20; Tom (2026-06-01), godina 2026: 12; zaposlen u siječnju te godine: 20; u prosincu: 2 (20 × 1 / 12 = 1,67); godina prije zaposlenja: 0.
+- `balance`: odobreni i godišnji na čekanju se zbrajaju po radnim danima; bolovanje, slobodni dan, odbijeni i otkazani se ne broje; zahtjev iz druge godine se ne broji. Zahtjeve test sprema sam (repozitorij ili SQL), jer seed nema zahtjeva (Q55).
+- `GET /api/me/balance` s fiksnim satom u 2026.: Tom dobiva `entitlement` 12, Ivan 20; bez tokena 401.

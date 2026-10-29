@@ -196,3 +196,59 @@ Format:
 **Odluka:** Ugniježđeni pozivi na sva tri mjesta razbijeni su u varijable s imenom.
 **Zašto:** Pravilo "Ugniježđeni pozivi razbijaju se u varijable s imenom."; međurezultat se vidi kod debugiranja.
 **Gdje:** `AuthApiTest.java`: `loginTokenCarriesIdentityClaims_T2` (`secretBytes`, `verifier`), `sign` (`issuedAt`, `header`, `keyBytes`, `signer`)
+
+## L17 · riješeno · T3 · pretpostavke
+
+**Problem** (developer): Sučelje T3 radi po pretpostavkama koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Za godine prije godine zaposlenja korisnik dobiva 0 dana godišnjeg.
+2. Zahtjev pripada godini svog početnog datuma; zahtjev je unutar jedne godine (specifikacija, odjeljak 5), pa je to i godina završnog datuma.
+3. Preostali dani mogu biti negativni ako je stanje mijenjano izravno u bazi (D6: korekcije se rade izravno u bazi); ne zaokružuju se na 0.
+4. U T3 korisnik vidi samo svoj saldo. Saldo članova tima za voditelja (Q16) i svih za admina (Q17) dolazi u T7 (Vidljivost).
+5. `GET /api/me/balance` vraća samo tekuću godinu, bez biranja godine.
+6. Provjeru da zahtjev za godišnji ne smije premašiti preostali saldo (R13) radi kreiranje zahtjeva u T4, ne T3.
+7. Brojanje radnih dana ne provjerava jesu li datumi u dobrom redoslijedu; to radi T4 (R8: završni datum nije prije početnog).
+
+- tester: OK: 1–7. Konflikta nema; sve se slaže sa sučeljem T3 i specifikacijom.
+
+**Odluka:** Svih sedam pretpostavki vrijedi.
+**Zašto:** Developer i tester se slažu, a sve je već upisano u sučelje T3; ništa se ne mijenja.
+**Gdje:** sučelje T3 (bez izmjena)
+
+## L18 · riješeno · T3 · sučelje T3 (Današnji datum, Saldo), D8
+
+**Problem** (tester): Testovi za T3 rade po dvije pretpostavke koje sučelje ne kaže izričito. Neka se potvrde ili isprave:
+
+1. Datum se računa u zoni sata, ne u zoni računala. Primjer: 31. 12. u 23:30 po UTC-u je u Zagrebu već 1. 1., pa je tekuća godina sljedeća (D8: zona Europe/Zagreb). Test zamijeni sat fiksnim satom sa zonom Europe/Zagreb i očekuje sljedeću godinu. Ako aplikacija uzima zonu računala, test pada kad testovi rade u UTC-u. Tehnički: `LocalDate.now(clock)`, a ne `clock.instant()` pa `ZoneId.systemDefault()`. Test: `BalanceApiNewYearTest.currentYearComesFromClockInZagrebTime_D8`.
+2. `Balance` je u istom paketu kao `BalanceService` (`com.example.timeoff.service`), a polja konstruktora idu redom iz sučelja: `year`, `entitlement`, `used`, `pending`, `remaining`. Testovi u `BalanceServiceTest.java` uspoređuju cijeli saldo odjednom (`new Balance(...)`).
+
+- developer: 1 i 2: potvrđujem. Datum se uzima kao `LocalDate.now(clock)`, u zoni sata; `Balance` je record u `com.example.timeoff.service` s poljima tim redom. Oboje dopisano u sučelje T3.
+
+**Odluka:** Datum se računa u zoni sata, ne računala. `Balance` je u paketu `com.example.timeoff.service`, polja konstruktora redom `year`, `entitlement`, `used`, `pending`, `remaining`.
+**Zašto:** D8 (zona Europe/Zagreb) vrijedi i kad računalo radi u UTC-u; testovi uspoređuju cijeli saldo pa im treba točan konstruktor.
+**Gdje:** sučelje T3, Saldo (`Balance`) i Današnji datum
+
+## L19 · riješeno · T3 · pretpostavke
+
+**Problem** (developer): Kod za T3 radi po još nekoliko pretpostavki koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Ako brojanje radnih dana dobije datume obrnutim redom, vrati 0 umjesto da padne. Tehnički: `WorkingDays.count(start, end)` s `end` prije `start`.
+2. Sat uzima zonu računala, a u Dockeru se ona zadaje varijablom `TZ` (D8: vremenska zona Europe/Zagreb). Kad se aplikacija pokrene lokalno bez `TZ`, vrijedi zona tog računala. Tehnički: `Clock.systemDefaultZone()`.
+3. Tekuću godinu određuje controller (sloj 3, API) iz sata, a servis dobiva godinu kao broj, kako piše u sučelju T3 (`balance(userId, year)`).
+4. Ako korisnik nestane iz baze baš usred poziva, `GET /api/me/balance` vrati 500, isto kao `GET /api/me` u T2 (L14, točka 3).
+
+- tester: OK: 1–4. Konflikta nema. Uz 2: testovi zamjenjuju sat fiksnim satom sa zonom Europe/Zagreb, pa ne ovise o zoni računala.
+
+**Odluka:** Sve četiri pretpostavke vrijede.
+**Zašto:** Developer i tester se slažu; ništa ne proturječi specifikaciji ni sučelju T3.
+**Gdje:** bez izmjena
+
+## L20 · riješeno · T3 · pravila kodiranja (Stil 2)
+
+**Problem** (reviewer, važno, za testera): U `BalanceApiTest.java`, test `balanceWithoutTokenIsUnauthorized_T3` (red 102), poziv je ugniježđen tri razine duboko: `assertThat(JsonPath.<String>read(response.body(), "$.detail"))`. Kod debugiranja se ne vidi tijelo odgovora ni pročitani `detail`. Isto je kao u L16. Pravilo: "Ugniježđeni pozivi razbijaju se u varijable s imenom."
+
+- tester: slažem se. Popravljeno navedeno mjesto, a da ne bude novih unosa, razbijeni su i svi ostali pozivi ugniježđeni tri razine u mojim testovima.
+
+**Odluka:** Svi pozivi ugniježđeni tri razine u testovima razbijeni su u varijable s imenom.
+**Zašto:** Pravilo "Ugniježđeni pozivi razbijaju se u varijable s imenom."; isti uzorak bio je na više mjesta, ne samo na prijavljenom.
+**Gdje:** `BalanceApiTest.java`: `balanceWithoutTokenIsUnauthorized_T3` (`body`, `detail`); `AuthApiTest.java`: `response` prije `problemDetail(...)` u svim testovima greške, `body` u `meReturnsOwnerOfLoginToken_T2`, `tokenSignedWithAppSecretIsAccepted_T2`, `adminFlagChangedInDatabaseAppliesWithoutNewLogin_D6` i `problemDetail`, `ivanId` u `loginTokenCarriesIdentityClaims_T2`; `SeedAndSchemaTest.java`: `matches` u `allUsersHavePasswordHashOfPassword_D16`, `request`, `ivan`, `ana` u `ownerIsRecognisedWhenLoadedSeparately_Q29`
