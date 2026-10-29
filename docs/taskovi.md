@@ -15,7 +15,7 @@ Cjelina se može razbiti na manje taskove kad krene rad.
 
 | # | Cjelina | Slojevi ([arhitektura](arhitektura.md)) | Stanje |
 | --- | --- | --- | --- |
-| T1 | Shema i seed | 5 Domena, 6 Repozitorij, 7 Baza | čeka |
+| T1 | Shema i seed | 5 Domena, 6 Repozitorij, 7 Baza | gotovo |
 | T2 | Login (JWT) | 2 Security, 3 API | čeka |
 | T3 | Radni dani i saldo | 3 API, 4 Servisi | čeka |
 | T4 | Kreiranje zahtjeva i validacija | 3 API, 4 Servisi | čeka |
