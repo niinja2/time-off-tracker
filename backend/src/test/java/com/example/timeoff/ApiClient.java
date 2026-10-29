@@ -35,6 +35,17 @@ class ApiClient {
         return http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    HttpResponse<String> post(String path, String token, String json) throws Exception {
+        HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(json);
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri(path))
+            .header("Content-Type", "application/json")
+            .POST(body);
+        if (token != null) {
+            builder.header("Authorization", "Bearer " + token);
+        }
+        return http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
     private URI uri(String path) {
         return URI.create("http://localhost:" + port + path);
     }

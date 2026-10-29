@@ -2,7 +2,12 @@ package com.example.timeoff.api;
 
 import com.example.timeoff.domain.InvalidStatusTransitionException;
 import com.example.timeoff.security.InvalidLoginException;
+import com.example.timeoff.service.InvalidRequestException;
+import com.example.timeoff.service.RuleViolationException;
+import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import tools.jackson.core.JacksonException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -25,6 +30,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(InvalidStatusTransitionException.class)
     ProblemDetail invalidStatusTransition(InvalidStatusTransitionException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    ProblemDetail invalidRequest(InvalidRequestException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(RuleViolationException.class)
+    ProblemDetail ruleViolation(RuleViolationException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
     }
 
@@ -51,5 +66,40 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 status,
                 request
         );
+    }
+
+    // An unreadable body (unknown type, malformed date) names the field, e.g. "type is invalid" (interface T4, check 1).
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException exception,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request
+    ) {
+        String field = unreadableField(exception);
+        String detail = field == null ? "Request body is not valid JSON" : field + " is invalid";
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+
+        return handleExceptionInternal(
+                exception,
+                problem,
+                headers,
+                status,
+                request
+        );
+    }
+
+    private String unreadableField(HttpMessageNotReadableException exception) {
+        if (!(exception.getCause() instanceof JacksonException jackson)) {
+            return null;
+        }
+
+        List<JacksonException.Reference> path = jackson.getPath();
+        if (path.isEmpty()) {
+            return null;
+        }
+
+        return path.getFirst()
+                .getPropertyName();
     }
 }

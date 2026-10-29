@@ -215,3 +215,74 @@ Tekuća godina i "danas" čitaju se iz Spring beana `java.time.Clock`, u zoni iz
 - `entitlement`: zaposlen 2020-01-01, godina 2026: 20; Tom (2026-06-01), godina 2026: 12; zaposlen u siječnju te godine: 20; u prosincu: 2 (20 × 1 / 12 = 1,67); godina prije zaposlenja: 0.
 - `balance`: odobreni i godišnji na čekanju se zbrajaju po radnim danima; bolovanje, slobodni dan, odbijeni i otkazani se ne broje; zahtjev iz druge godine se ne broji. Zahtjeve test sprema sam (repozitorij ili SQL), jer seed nema zahtjeva (Q55).
 - `GET /api/me/balance` s fiksnim satom u 2026.: Tom dobiva `entitlement` 12, Ivan 20; bez tokena 401.
+
+## T4 Kreiranje zahtjeva i validacija
+
+Slojevi: 3 API, 4 Servisi (arhitektura). Paketi: `com.example.timeoff.service` za servis i iznimke, `com.example.timeoff.api` za controller.
+
+### Endpoint
+
+| Metoda i put | Prijava | Tijelo | Odgovor |
+| --- | --- | --- | --- |
+| `POST /api/requests` | `Authorization: Bearer <JWT>` | `{ "type": "VACATION", "startDate": "2026-11-02", "endDate": "2026-11-06", "reason": "Trip" }` | 201 `<Request>` |
+
+- Vlasnik je uvijek prijavljeni korisnik; tijelo nema polje za vlasnika (Q29: zahtjev podnosi samo vlasnik). Isto vrijedi za voditelje i admine.
+- `type`: `VACATION`, `SICK_LEAVE` ili `DAY_OFF`. Datumi u obliku `yyyy-MM-dd`. `reason` nije obavezan (brief); prazan ili samo razmaci sprema se kao `null`.
+- Novi zahtjev je `PENDING`, `createdAt` je trenutak iz `Clock` (T3, Današnji datum).
+
+`<Request>`: `{ "id": 1, "ownerId": 2, "type": "VACATION", "startDate": "2026-11-02", "endDate": "2026-11-06", "reason": "Trip", "status": "PENDING", "createdAt": "2026-10-30T09:00:00Z" }`. Polja odluke i otkazivanja dodaju T5 i T6.
+
+### Validacija
+
+Provjere idu ovim redom; prva koja padne određuje odgovor. Sve greške su `application/problem+json`, kao u T2.
+
+| # | Provjera | Status | `detail` |
+| --- | --- | --- | --- |
+| 1 | Nedostaje `type`, `startDate` ili `endDate`; nepoznat `type`; datum nije datum; tijelo nije JSON | 400 | koje polje nije ispravno |
+| 2 | `reason` dulji od 500 znakova | 400 | `reason size must be between 0 and 500` |
+| 3 | `endDate` prije `startDate` (R8: završni datum nije prije početnog) | 400 | `End date must not be before start date` |
+| 4 | `startDate` i `endDate` u različitim godinama (specifikacija 5: zahtjev je unutar jedne kalendarske godine) | 400 | `Request must be within one calendar year` |
+| 5 | Nema nijednog radnog dana, `WorkingDays.count` = 0 (R10: zahtjev bez radnog dana je nevaljan) | 400 | `Request must contain at least one working day` |
+| 6 | `startDate` prije `hireDate` korisnika (D4: zahtjev ne počinje prije datuma zaposlenja) | 409 | `Request must not start before hire date` |
+| 7 | Preklapa se s korisnikovim zahtjevom u stanju `PENDING` ili `APPROVED`, bilo kojeg tipa; dodir na rubu je preklapanje (R9: nema preklapanja) | 409 | `Request overlaps an existing pending or approved request` |
+| 8 | Samo `VACATION`: radni dani zahtjeva > `remaining` iz `BalanceService.balance(userId, godina startDate)` (R13: ne smije premašiti preostali saldo) | 409 | `Not enough vacation days: requested X, remaining Y` |
+
+- Pravilo za 400 i 409: 400 ako je tijelo neispravno samo po sebi (provjere 1–5); 409 ako se sudara s podacima u bazi (provjere 6–8) (specifikacija 8).
+- `REJECTED` i `CANCELLED` zahtjevi ne smetaju preklapanju (R9).
+- Zahtjev koji troši točno preostali saldo je dopušten. `SICK_LEAVE` i `DAY_OFF` ne gledaju saldo (R14).
+- Datumi u prošlosti i budućnosti su dopušteni, bez granice (Q19–Q22, Q25).
+
+### Servis
+
+`RequestService` (Spring servis):
+
+| Metoda | Vraća | Radi |
+| --- | --- | --- |
+| `create(Long userId, NewRequest command)` | `TimeOffRequest` | učita korisnika, provjeri 3–8, spremi; sve u jednoj transakciji |
+
+`NewRequest` (record u `com.example.timeoff.service`): `type` (`TimeOffType`), `startDate`, `endDate` (`LocalDate`), `reason` (`String`), tim redom.
+
+Iznimke (paket `com.example.timeoff.service`), API ih pretvara u statuse:
+
+| Iznimka | Status |
+| --- | --- |
+| `InvalidRequestException` | 400 |
+| `RuleViolationException` | 409 |
+
+- Provjere 1 i 2 radi API (oblik ulaza); 3–8 servis (arhitektura: je li ulaz dopušten, odlučuje servis).
+- Svaka provjera je mala funkcija na jednom mjestu (pravila kodiranja, Načelo 5); blagdani i zahtjev preko granice godine (proširenja) mijenjali bi samo provjere 4 i 5 i `WorkingDays`.
+- Popis vlastitih zahtjeva i dohvat jednog zahtjeva dolaze u T7 (Vidljivost).
+
+### Što testovi mogu provjeriti
+
+- Ispravan zahtjev svakog tipa: 201, `status` `PENDING`, `ownerId` prijavljenog korisnika, spremljen u bazi; `reason` se smije izostaviti.
+- Bez tokena: 401.
+- Svaka provjera 1–8 sa svojim statusom; zahtjev se tada ne sprema.
+- R8: `endDate` = `startDate` na radni dan je dopušten (1 dan).
+- R10: samo subota i nedjelja: 400.
+- D4: Tom (zaposlen 2026-06-01) od 2026-05-29: 409; od 2026-06-01: 201.
+- R9: preklapanje s `PENDING` i `APPROVED`, i s drugim tipom: 409; s `REJECTED` i `CANCELLED`: 201; dodir na rubu: 409; preklapanje s tuđim zahtjevom: 201.
+- R13: s fiksnim satom u 2026. Tom (12 dana) traži 12 radnih dana: 201; 13: 409. Godišnji na čekanju troši saldo: drugi zahtjev preko ostatka: 409. `SICK_LEAVE` i `DAY_OFF` preko salda: 201.
+- Saldo se računa za godinu `startDate`, ne tekuću: godišnji u 2027. troši saldo 2027.
+- Datum u prošlosti (npr. 2026-01-05) je dopušten.
+- Postojeće zahtjeve test sprema sam (repozitorij ili SQL), kao u T3.

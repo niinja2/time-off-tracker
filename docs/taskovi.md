@@ -18,7 +18,7 @@ Cjelina se može razbiti na manje taskove kad krene rad.
 | T1 | Shema i seed | 5 Domena, 6 Repozitorij, 7 Baza | gotovo |
 | T2 | Login (JWT) | 2 Security, 3 API | gotovo |
 | T3 | Radni dani i saldo | 3 API, 4 Servisi | gotovo |
-| T4 | Kreiranje zahtjeva i validacija | 3 API, 4 Servisi | čeka |
+| T4 | Kreiranje zahtjeva i validacija | 3 API, 4 Servisi | gotovo |
 | T5 | Odobravanje i odbijanje | 3 API, 4 Servisi | čeka |
 | T6 | Otkazivanje | 3 API, 4 Servisi | čeka |
 | T7 | Vidljivost i kalendar | 3 API, 4 Servisi | čeka |

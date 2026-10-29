@@ -252,3 +252,31 @@ Format:
 **Odluka:** Svi pozivi ugniježđeni tri razine u testovima razbijeni su u varijable s imenom.
 **Zašto:** Pravilo "Ugniježđeni pozivi razbijaju se u varijable s imenom."; isti uzorak bio je na više mjesta, ne samo na prijavljenom.
 **Gdje:** `BalanceApiTest.java`: `balanceWithoutTokenIsUnauthorized_T3` (`body`, `detail`); `AuthApiTest.java`: `response` prije `problemDetail(...)` u svim testovima greške, `body` u `meReturnsOwnerOfLoginToken_T2`, `tokenSignedWithAppSecretIsAccepted_T2`, `adminFlagChangedInDatabaseAppliesWithoutNewLogin_D6` i `problemDetail`, `ivanId` u `loginTokenCarriesIdentityClaims_T2`; `SeedAndSchemaTest.java`: `matches` u `allUsersHavePasswordHashOfPassword_D16`, `request`, `ivan`, `ana` u `ownerIsRecognisedWhenLoadedSeparately_Q29`
+
+## L21 · riješeno · T4 · pretpostavke
+
+**Problem** (developer): Sučelje T4 radi po pretpostavkama koje specifikacija ne kaže. Neka se potvrde ili isprave:
+
+1. Greška je 400 ako je zahtjev neispravan sam po sebi (fali polje, krivi redoslijed datuma, preko granice godine, nema radnog dana), a 409 ako se sudara s podacima u bazi (prije datuma zaposlenja, preklapanje, saldo). Specifikacija (odjeljak 8) izričito navodi samo završni datum prije početnog (400) te preklapanje i saldo (409).
+2. Provjere idu fiksnim redom i javlja se samo prva koja padne, ne sve odjednom.
+3. Prazan razlog (ili samo razmaci) sprema se kao da razloga nema. Razlog smije imati najviše 500 znakova, koliko stane u bazu.
+4. Godišnji koji troši točno sve preostale dane je dopušten; odbija se tek kad traži više.
+5. Saldo se provjerava za godinu u koju zahtjev pada, ne za tekuću (D5: zahtjev troši saldo godine u koju pada).
+6. Odgovor na kreiranje vraća samo osnovna polja zahtjeva; polja odluke i otkazivanja dodaju T5 i T6. Popis vlastitih zahtjeva dolazi u T7 (Vidljivost), ne u T4.
+7. Poruke grešaka (`detail`) su na engleskom (Q54: sve na engleskom), s tekstom iz sučelja T4.
+
+- tester: slažem se sa svim pretpostavkama.
+
+**Odluka:** Svih sedam pretpostavki vrijedi.
+**Zašto:** Developer i tester se slažu; ništa ne proturječi specifikaciji ni sučelju T4.
+**Gdje:** `service/RequestService.java` (provjere 3–8 redom, prazan razlog u `null`), `api/RequestController.java` (provjere 1–2, `@Size(max = 500)`), `api/ApiExceptionHandler.java` (400 i 409, `detail` imenuje neispravno polje)
+
+## L22 · riješeno · T4 · pravila kodiranja (Stil 2)
+
+**Problem** (reviewer, važno, za testera): U `RequestApiTest.java` poziv je na dva mjesta ugniježđen tri razine duboko, pa se kod debugiranja ne vidi tijelo odgovora ni pročitani tip: `assertThat(JsonPath.<String>read(response.body(), "$.type"))` u `sickLeaveRequestIsCreated_T4` (red 116) i `dayOffRequestIsCreated_T4` (red 124). Isti uzorak kao u L20. Pravilo: "Ugniježđeni pozivi razbijaju se u varijable s imenom."
+
+- tester: slažem se. Na oba mjesta tijelo odgovora i pročitani tip su sada u varijablama s imenom (`body`, `type`).
+
+**Odluka:** Tijelo odgovora i pročitani tip izdvojeni su u varijable s imenom na oba mjesta.
+**Zašto:** Pravilo "Ugniježđeni pozivi razbijaju se u varijable s imenom."; kod debugiranja se vide tijelo odgovora i pročitani tip.
+**Gdje:** `RequestApiTest.java`: `sickLeaveRequestIsCreated_T4` i `dayOffRequestIsCreated_T4` (`body`, `type`)
