@@ -1,7 +1,7 @@
 # Time-off tracker: atomarna pitanja
 
 Datum: 2026-10-23
-Izvor: [time-off-tracker-task.md](../time-off-tracker-task.md)
+Izvor: [brief](brief.md)
 Status: iteracija 1 odgovorena 2026-10-24, iteracija 2 odgovorena 2026-10-27.
 Pravila izvedena iz odgovora: [specifikacija.md](specifikacija.md)
 Verzija za kolegu (odgovori stižu ovdje): [Google Doc](https://docs.google.com/document/d/1Cfb7SYzos2wvA-kimolamtTCHPieWZ1pANXhMILuLTw/edit)
