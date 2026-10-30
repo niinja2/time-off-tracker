@@ -6,6 +6,7 @@ import {
   createRequest,
   getApprovals,
   getCalendar,
+  getCancellableRequests,
   getMe,
   getMyBalance,
   getMyRequests,
@@ -47,6 +48,13 @@ describe("calls with token", () => {
       body: { reason: "Plans changed" },
     },
     { name: "getApprovals", call: () => getApprovals(), method: "GET", url: "/api/approvals", body: undefined },
+    {
+      name: "getCancellableRequests (T8.1)",
+      call: () => getCancellableRequests(),
+      method: "GET",
+      url: "/api/approvals/cancellable",
+      body: undefined,
+    },
     {
       name: "approveRequest",
       call: () => approveRequest(7, "ok"),

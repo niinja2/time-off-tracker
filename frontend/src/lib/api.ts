@@ -126,6 +126,10 @@ export function getApprovals(): Promise<TimeOffRequest[]> {
   return call<TimeOffRequest[]>("GET", "/api/approvals");
 }
 
+export function getCancellableRequests(): Promise<TimeOffRequest[]> {
+  return call<TimeOffRequest[]>("GET", "/api/approvals/cancellable");
+}
+
 export function approveRequest(id: number, comment: string): Promise<TimeOffRequest> {
   return call<TimeOffRequest>("POST", `/api/requests/${id}/approve`, { body: { comment } });
 }

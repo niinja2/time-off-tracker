@@ -5,9 +5,9 @@ Jedini kanal između uloga (developer, tester, revieweri). Svaki problem ima svo
 Pravila:
 
 - Developer i tester dodaju novi unos na dno: naslov sa stanjem `otvoreno` i **Problem**.
-- Rasprava ide ispod Problema, jedan redak po javljanju, najviše dva kruga. Sudac je [specifikacija](specifikacija.md): argument pokazuje na oznaku (R, Q, D), ne na mišljenje. Ako se ne slože ili specifikacija ne odgovara, odlučuje Rajko.
+- Rasprava ide ispod Problema, jedan redak po javljanju, najviše dva kruga. Sudac je [specifikacija](specifikacija.md): argument pokazuje na oznaku (R, Q, D), ne na mišljenje. Ako se ne slože ili specifikacija ne odgovara, odlučuje vlasnik specifikacije.
 - Tehnička pitanja (sučelje, tipovi, testna infrastruktura) rješavaju developer i tester sami, u raspravi, i sami upisuju **Odluka**, **Zašto** i **Gdje**.
-- Orkestrator ulazi samo kad se radi o ponašanju (specifikacija ne odgovara) ili kad se developer i tester ne slože ni nakon dva kruga. Tada **Odluku** i **Zašto** upisuje on, uz Rajkovu odluku.
+- Orkestrator ulazi samo kad se radi o ponašanju (specifikacija ne odgovara) ili kad se developer i tester ne slože ni nakon dva kruga. Tada **Odluku** i **Zašto** upisuje on, uz odluku vlasnika specifikacije.
 - Odluka koja mijenja ponašanje ulazi i u specifikaciju kao nova oznaka D.
 - Čita se pretragom po oznaci (`L4`, `T3`, `R13`), ne cijeli fajl.
 - Riješeni i odbačeni unosi se na kraju taska sele u `coding-log-arhiva.md`.
@@ -386,7 +386,7 @@ Format:
 **Zašto:** Developer i tester se slažu; sve se slaže sa specifikacijom 7 (Vidljivost) i sučeljem T7, nema konflikta.
 **Gdje:** sučelje T7 (bez izmjena); testovi `VisibilityApiTest.java`, `CalendarApiTest.java`
 
-## L28 · odlučeno (orkestrator, Rajko pregledava) · T7 · specifikacija 12 (Approvals), Q16
+## L28 · odlučeno (orkestrator) · T7 · specifikacija 12 (Approvals), Q16
 
 **Problem** (developer): Specifikacija ne kaže treba li ekran Approvals uz zahtjev za godišnji pokazati saldo podnositelja (koliko mu dana ostaje). Voditelj smije vidjeti saldo članova svog tima (Q16), a endpoint za to T7 dodaje (`GET /api/users/{id}/balance`), ali specifikacija 12 za Approvals navodi samo popis zahtjeva na čekanju s odobravanjem i odbijanjem. Odluka utječe samo na frontend (T8).
 
@@ -434,7 +434,7 @@ Format:
 8. Stupac Comment na My time off pokazuje komentar odluke, a ako ga nema, razlog otkazivanja.
 9. Frontend zove API relativnim putem (`/api/...`), a Next.js ga prosljeđuje backendu, pa backend ne treba CORS. Adresa backenda je varijabla `API_URL` (za Docker u T9).
 10. Frontend testovi su u `frontend/tests/` (Vitest, React Testing Library, jsdom) i ne trebaju backend: odgovore daje lažni `fetch`. Tester za T8 zato treba vidjeti i `frontend/tests/`, ne samo `backend/src/test/` (za Rajka).
-    - orkestrator (Rajko pregledava): da, tester čita i piše `frontend/tests/`; `frontend/src/` ne otvara, isto kao `backend/src/main`.
+    - orkestrator: da, tester čita i piše `frontend/tests/`; `frontend/src/` ne otvara, isto kao `backend/src/main`.
 11. `@types/node` je podignut s 20 na 22, jer ga Vitest traži, a lokalni Node je 22.
 
 - tester: 1: OK, arhitektura sloj 1 i specifikacija 12 (ekran prikazuje poruku greške); test: prazna forma za prijavu i za novi zahtjev šalje prazne vrijednosti i prikaže `detail`.
@@ -453,7 +453,7 @@ Format:
 **Zašto:** Developer i tester se slažu; sve se slaže sa specifikacijom 7 i 12, arhitekturom (sloj 1: frontend ne odlučuje) i odlukama L28, L32, L33.
 **Gdje:** sučelje T8 (bez izmjena); testovi u `frontend/tests/`
 
-## L32 · odlučeno (orkestrator, Rajko pregledava) · T8 · Q46, Q30, Q31, specifikacija 7
+## L32 · odlučeno (orkestrator) · T8 · Q46, Q30, Q31, specifikacija 7
 
 **Problem** (developer): Specifikacija 7 kaže da zaposlenik vidi svoje zahtjeve "uključujući tko je odlučio i tko je otkazao" (Q46: tko je odlučio; Q30, Q31: tko je otkazao). API (T5, T6) za to vraća samo broj korisnika (`decidedById`, `cancelledById`), ne ime, pa ekran My time off ne može napisati "Approved by Ana". Pitanje: treba li My time off prikazati ime onoga tko je odlučio ili otkazao? Ako da, backend bi u `<Request>` dodao `decidedByName` i `cancelledByName` (kao `ownerName` u T5); ako ne, ekran to ne prikazuje, a podatak ostaje u API-ju. Dok se ne odluči, sučelje T8 to ne prikazuje.
 
@@ -461,7 +461,7 @@ Format:
 **Zašto:** Specifikacija 7 izričito kaže da zaposlenik vidi tko je odlučio i tko je otkazao (Q46, Q30, Q31); broj korisnika to ne pokazuje. Promjena je mala i u postojećem `<Request>`.
 **Gdje:** sučelje T7 `<Request>` (dva nova polja), sučelje T8 My time off; backend test i frontend test (tester)
 
-## L33 · odlučeno (orkestrator, Rajko pregledava) · T8 · specifikacija 4, specifikacija 12, Q30, Q31, Q32, D14
+## L33 · zamijenjeno s L39 · T8 · specifikacija 4, specifikacija 12, Q30, Q31, Q32, D14
 
 **Problem** (developer): Voditelj i admin smiju otkazati tuđi zahtjev, uz razlog (specifikacija 4; Q30, Q31, Q32: voditelj i admin otkazuju; D14: tko smije odobriti, smije i otkazati). Specifikacija 12 ne daje im za to ekran: Approvals ima samo zahtjeve na čekanju s odobravanjem i odbijanjem, a My time off samo vlastite. Pitanje: treba li frontend ponuditi otkazivanje tuđih zahtjeva (npr. odobrenih) ili to ostaje samo u API-ju (`POST /api/requests/{id}/cancel`)? Dok se ne odluči, sučelje T8 ga nema (80/20).
 
@@ -521,3 +521,83 @@ Format:
 **Odluka:** `HomeRedirect` je u sučelju T8 (Komponente) i ima test za oba slučaja.
 **Zašto:** Sučelje T8 (Rute): `/` samo preusmjerava; bez testa bi pokvareno preusmjeravanje ostavilo praznu početnu stranicu.
 **Gdje:** sučelje T8, Komponente (`HomeRedirect`); `frontend/tests/HomeRedirect.test.tsx`: `with token goes to My time off without calling the API (L37)`, `without token goes to login without calling the API (L37)`
+
+## L38 · riješeno · T9 · pretpostavke
+
+**Problem** (developer): Docker i README za T9 rade po pretpostavkama koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Backend slika se gradi Mavenom iz službene slike `maven:3.9-eclipse-temurin-21`, ne s `./mvnw`, jer je `maven-wrapper.jar` u `.gitignore`. Testovi se kod gradnje slike ne pokreću (`-DskipTests`): trebaju Docker (Testcontainers), a pokreću se zasebno s `./mvnw test`.
+2. Backend dobiva bazu preko `SPRING_DATASOURCE_URL`, `_USERNAME`, `_PASSWORD`; Spring ih čita prije postavki iz `application.properties` (`DB_URL` i ostale), pa se `application.properties` ne mijenja.
+3. Backend je izložen i izravno na portu 8080 (uz frontend na 3000), da se API može zvati izravno kao razni korisnici (brief: "We will call your API directly"). Baza ostaje izložena na 5432 kao i prije.
+4. Frontend čeka samo da backend krene, ne da bude zdrav: proslijeđivanje `/api` ide tek kod svakog poziva, a slika backenda nema `curl` za provjeru zdravlja.
+5. `API_URL` je build arg (`http://backend:8080`) i postavlja se i kod pokretanja, za svaki slučaj (L34, točka 1: čita se kod gradnje).
+6. `TZ: Europe/Zagreb` zadan je i backendu i frontendu, ne samo bazi (D8: vremenska zona se postavlja varijablom `TZ`; "danas" i tekuća godina čitaju se u backendu).
+7. `.env.example` ima vrijednost-primjer koju treba zamijeniti; `.env` je u root `.gitignore`.
+8. README spominje korekcije u bazi (D6) samo kao odluku, bez SQL postupka.
+
+- orkestrator: dodano u README (odjeljak Data corrections).
+- tester: OK: 1–8. T9 se provjerava ručno, ne automatskim testovima. Uz 4: odmah nakon `docker compose up` prvi pozivi mogu pokazati `Cannot reach the server` dok backend ne krene; kod ručne provjere to nije greška.
+
+**Odluka:** Svih osam pretpostavki vrijedi.
+**Zašto:** Developer i tester se slažu; nema konflikta.
+**Gdje:** T9 (Docker, README); bez izmjena sučelja ni testova
+
+## L39 · riješeno · T8.1 · Q30, Q31, Q32, D14, L33
+
+**Problem** (orkestrator): L33 je otkazivanje tuđih zahtjeva ostavio samo u API-ju. Naručitelj je na Q30 (voditelj otkazuje tuđi zahtjev), Q31 (admin otkazuje) i Q32 (povlačenje danog odobrenja) odgovorio "da", pa korisnik to mora moći napraviti u aplikaciji. Odluka L33 se mijenja.
+
+**Odluka:** Ekran Approvals dobiva drugu tablicu "Approved requests": odobreni zahtjevi koje prijavljeni smije otkazati, a koji još nisu počeli. Svaki red ima polje "Cancel reason" i gumb "Cancel". Razlog je obavezan (D3), a provjerava ga backend. Pravila ne idu u frontend: tko smije i je li zahtjev počeo odlučuje backend (403 ili 409 se prikaže kao greška).
+**Zašto:** Q30, Q31, Q32: naručitelj to traži; backend to već podržava (T6).
+**Gdje:** sučelje T8.1, ApprovalsScreen
+
+- developer: postojeći API takav popis ne daje (`GET /api/requests` vraća i zahtjeve koji su počeli i one koje korisnik ne smije otkazati). orkestrator: novi backend endpoint koji koristi postojeći `CancelPolicy` i provjeru početka iz T6, bez ponavljanja pravila. T8.1 zato dobiva i slojeve 3 API i 4 Servisi (taskovi.md).
+
+## L40 · riješeno · T8.1 · pretpostavke
+
+**Problem** (developer): Sučelje T8.1 radi po pretpostavkama koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Vlastiti odobreni zahtjevi nisu na popisu `GET /api/approvals/cancellable`, ni za admina; svoje zahtjeve korisnik otkazuje na My time off (T8; R6, R7: vlasnik otkazuje svoj zahtjev).
+2. "Nije počeo" znači da je `startDate` poslije danas; zahtjev koji počinje danas je počeo i nije na popisu (Q23: zahtjev koji počinje danas je već započeo).
+3. Endpoint je pod `/api/approvals/...`, uz popis za odobravanje (T5), a ne pod `/api/requests`.
+4. Tablica `Approved requests` nema stupac `Reason`, nego `Approved by` (`decidedByName`, L32): razlog zahtjeva ne treba za otkazivanje, a tko je odobrio treba.
+5. Obje tablice na Approvals dobivaju naslov razine 2 (`Pending requests`, `Approved requests`). Za `Pending requests` to je mala dopuna T8 koja ne mijenja ništa što testovi T8 traže.
+6. Ako pri otvaranju ekrana padne jedan od dva poziva (`getApprovals`, `getCancellableRequests`), prikaže se `alert` s `detail`, kao u T8.
+
+- tester: OK: 1–4. Konflikt: 5 i 6.
+  - 5: dopuna T8 mijenja što testovi T8 traže. Problem nisu naslovi, nego drugi poziv pri otvaranju ekrana. Postojeći test `lists pending requests in API order without loading balances (L28)` traži da ekran zove samo `/api/approvals`, pa će pasti. Ostali testovi u `ApprovalsScreen.test.tsx` ne daju odgovor za `/api/approvals/cancellable`, pa ekran prikaže `alert`, a test `Reject without comment goes to the backend and shows its 400` tada nađe krivi `alert`. Te testove mijenjam ja (tester): svaki dobiva odgovor i za drugi popis. Developer ne mijenja ništa; samo neka točka 5 ne kaže "ne mijenja ništa što testovi T8 traže".
+  - 6: nije rečeno što se vidi kad padne samo jedan poziv. Pitanje: prikaže li se tablica koja se učitala (npr. `Pending requests`) uz `alert`, ili samo `alert`? I kad padnu oba poziva: jedan `alert` ili dva? Pretpostavljam: tablica koja se učitala ostaje, a `alert` je jedan, s `detail` prve greške. Neka developer potvrdi ili ispravi.
+
+- developer: 5: potvrđujem; rečenica "ne mijenja ništa što testovi T8 traže" bila je kriva. Drugi poziv pri otvaranju mijenja što testovi T8 traže, pa ih tester prilagođava; developer ne mijenja ništa. 6: potvrđujem testerovu pretpostavku; tablica koja se nije učitala ne prikazuje se, ni tekst za prazan popis. Dopisano u sučelje T8.1, Approvals.
+
+**Odluka:** Pretpostavke 1–4 vrijede. Točka 5 je ispravljena: testove T8 za `ApprovalsScreen` prilagođava tester (odgovor i za `/api/approvals/cancellable`). Točka 6: tablica koja se učitala ostaje, tablica koja se nije učitala ne prikazuje se; `alert` je jedan, s `detail` prve greške, i kad padnu oba poziva.
+**Zašto:** Developer i tester se slažu. Jedan `alert` drži pravilo iz T8 (greška u elementu s `role="alert"`), a učitani podaci ostaju korisni.
+**Gdje:** sučelje T8.1, Approvals; `ApprovalsScreen.test.tsx` (tester)
+
+## L41 · riješeno · T8.1 · sučelje T8.1 (Approvals), L40, Q30, Q32
+
+**Problem** (tester, za developera): Dvije stvari na ekranu Approvals nisu rečene:
+
+1. "Prva greška" kad padnu oba poziva. Ekran oba popisa traži odjednom, pa nije jasno koja je greška prva: ona od poziva koji je prvi poslan, ili od onog koji je prvi odgovorio? Pretpostavljam: greška iz `getApprovals()`, jer je taj poziv prvi naveden (sučelje T8.1, "Pri otvaranju zove `getApprovals()` i `getCancellableRequests()`"). Dok se ne potvrdi, test `both lists failing show one alert and no tables (L40.6)` provjerava samo da je `alert` jedan i da ima `detail` jedne od dvije greške.
+2. Što se ponovo učita nakon odobrenja. T8 kaže: nakon `Approve` ponovo `getApprovals()`. Odobreni zahtjev koji nije počeo sad pripada i tablici `Approved requests` (Q32: povlačenje danog odobrenja). Ako se `getCancellableRequests()` ne zove ponovo, voditelj ga ne vidi dok ne otvori ekran ponovo. Pretpostavljam: nakon `Approve` i `Reject` ponovo se zovu oba popisa, kao nakon `Cancel`. Neka developer potvrdi ili ispravi; test za to još ne postoji.
+
+- developer: potvrđujem 1 i 2. Uz 1: ekran pričeka oba odgovora pa bira grešku po redoslijedu iz sučelja, ne po tome koji poziv prvi odgovori, pa test ne ovisi o vremenu. Dopisano u sučelje T8.1, Approvals.
+- tester: OK. Test `both lists failing show one alert with the approvals error and no tables (L40.6, L41.1)` sada traži grešku iz `getApprovals()`. Dodana su tri testa, jer ponašanje nijedan test nije provjeravao: `approvals error wins even when the cancellable error answers first (L41.1)` (odgovor na `getApprovals()` stiže kasnije), `Approve reloads both lists and the approved request joins Approved requests (L41.2, Q32)`, `Reject reloads both lists (L41.2)`.
+
+**Odluka:** 1: kad padnu oba poziva, `alert` ima `detail` greške iz `getApprovals()`. 2: nakon uspješnog `Approve` i `Reject` ponovo se zovu oba popisa, `getApprovals()` i `getCancellableRequests()`, kao nakon `Cancel`.
+**Zašto:** Developer i tester se slažu. Redoslijed iz sučelja je uvijek isti, a vrijeme odgovora nije. Odobreni zahtjev koji nije počeo odmah se smije otkazati (Q32: povlačenje danog odobrenja), pa ga voditelj treba vidjeti bez ponovnog otvaranja ekrana.
+**Gdje:** sučelje T8.1, Approvals; `ApprovalsScreen.test.tsx` (tester)
+
+## L42 · riješeno · T8.1 · pretpostavke
+
+**Problem** (developer): Kod za T8.1 radi po još nekoliko pretpostavki koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Kad ponovno učitavanje nakon `Approve`, `Reject` ili `Cancel` padne, tablica koja se nije učitala zadržava stare podatke, ne nestaje. Sučelje T8.1 (L40) kaže samo što se vidi pri otvaranju ekrana, kad starih podataka još nema.
+2. Naslov i tablica su zajedno u `<section>` bez imena, pa to nije `region` i test ga ne nalazi po ulozi; tablice se i dalje traže po imenu (`Pending requests`, `Approved requests`).
+3. `Comment` i `Cancel reason` pamte se po retku i ostaju upisani kad akcija padne (kao upisane vrijednosti forme u T8).
+4. Gumb `Cancel` u tablici `Approved requests` ima isti sporedni stil kao `Reject`.
+
+- tester: OK: 1–4. Za 1 i 3 dodana su četiri testa, jer ponašanje nijedan test nije provjeravao: `failed reload after Cancel keeps the old approved rows and shows the alert (L42.1)`, `failed reload after Approve keeps the old pending rows and shows the alert (L42.1)`, `failed Cancel keeps the typed reason in its row (L42.3)`, `failed Reject keeps the typed comment in its row (L42.3)`. Za 2 testovi već traže tablice po imenu, a naslove po ulozi `heading`. Za 4 test ne treba.
+
+**Odluka:** Sve četiri pretpostavke vrijede.
+**Zašto:** Developer i tester se slažu; nema konflikta. Stari podaci i upisane vrijednosti ostaju kao u T8 (upisane vrijednosti forme ostaju kad akcija padne).
+**Gdje:** kod T8.1 (bez izmjena sučelja); `frontend/tests/ApprovalsScreen.test.tsx`: četiri testa s oznakama L42.1 i L42.3

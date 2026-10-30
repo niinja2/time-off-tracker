@@ -800,3 +800,79 @@ Seed (T1): Ana vodi Platform, Eva je admin, Ivan je zaposlenik. Odgovore backend
 - My time off: saldo iz `getMyBalance`; redovi tablice s prikazom tipa i stanja; `Approved by Ana`, `Rejected by Ana`, `Cancelled by Eva`, `Pending` bez imena (L32); `Cancel` samo za `Pending` i `Approved`; slanje forme šalje upisane vrijednosti i ponovo učita popis i saldo; 409 iz `createRequest` prikaže `detail`, vrijednosti ostaju; otkazivanje s razlogom; 409 `Request has already started` se prikaže.
 - Approvals: red s `ownerName`; `Approve` i `Reject` šalju komentar iz svog retka; 400 `comment must not be blank` se prikaže; nakon uspjeha red nestane; prazan popis daje `No requests waiting for approval.`
 - Team calendar: tekući mjesec iz sata; `Next month` i `Previous month` zovu `getCalendar` s pravim `month`; izbor tima šalje `teamId`, `All teams` ga ne šalje; unos od petka do utorka pokazuje se pod petkom, ponedjeljkom i utorkom, ne pod vikendom; unos koji počinje u prethodnom mjesecu pokazuje se od prvog dana mjeseca; `FULL` unos s tipom i stanjem, `LIMITED` samo ime; prazan mjesec daje `No absences this month.`
+
+## T8.1 Otkazivanje tuđih zahtjeva kroz UI
+
+Slojevi: 1 Frontend, 3 API, 4 Servisi (arhitektura; L39). Backend daje popis odobrenih zahtjeva koje prijavljeni smije otkazati, a frontend ga prikazuje na ekranu Approvals. Pravila (tko smije, je li zahtjev počeo) ostaju u backendu (T6), frontend ih ne ponavlja.
+
+### Backend: endpoint
+
+| Metoda i put | Prijava | Tijelo | Odgovor |
+| --- | --- | --- | --- |
+| `GET /api/approvals/cancellable` | `Authorization: Bearer <JWT>` | nema | 200 `[<Request>, ...]` (`<Request>` iz T7) |
+
+Zahtjev je na popisu kad vrijedi sve:
+
+| # | Uvjet | Izvor |
+| --- | --- | --- |
+| 1 | `status` je `APPROVED` | L39 |
+| 2 | vlasnik nije prijavljeni korisnik (svoje otkazuje na My time off, T8) | L39 |
+| 3 | `CancelPolicy.canCancel` vraća `true` (T6, Ovlasti) | Q30, Q31, Q32, D14 |
+| 4 | nije počeo: `startDate` je poslije danas (`LocalDate.now(clock)`) | R7, Q23, Q30.1, Q31.1 |
+
+- Poredani po `startDate`, pa po `id`, kao `GET /api/approvals`.
+- Tko ne smije otkazati ništa, dobiva praznu listu, ne 403.
+- Provjera "počeo" postoji na jednom mjestu u servisu T6 i koriste je i `cancel` i ovaj popis.
+
+### Backend: servis
+
+`CancelService` (T6) dobiva metodu, u transakciji samo za čitanje:
+
+| Metoda | Vraća | Radi |
+| --- | --- | --- |
+| `cancellable(Long actorId)` | `List<TimeOffRequest>` | zahtjevi `APPROVED` po uvjetima 2–4, poredani kao gore |
+
+### Frontend: API klijent (`src/lib/api.ts`)
+
+| Funkcija | Upit | Tijelo | Vraća |
+| --- | --- | --- | --- |
+| `getCancellableRequests()` | `GET /api/approvals/cancellable` | | `TimeOffRequest[]` |
+
+Poziva `fetch` kao ostale funkcije (T8, API klijent). `cancelRequest(id, reason)` iz T8 se ne mijenja.
+
+### Frontend: Approvals (`ApprovalsScreen`)
+
+Pri otvaranju zove `getApprovals()` i `getCancellableRequests()`. Tablica `Pending requests` iz T8 ostaje ista. Ispod nje je druga:
+
+`table` s imenom `Approved requests`, redoslijed kako vrati API:
+
+| Stupac | Sadržaj |
+| --- | --- |
+| `Employee` | `ownerName` |
+| `Type` | tip |
+| `Start date` | `startDate` |
+| `End date` | `endDate` |
+| `Approved by` | `decidedByName`, prazno ako `null` |
+| `Cancel` | `textbox` s labelom `Cancel reason`, gumb `Cancel` |
+
+- Svaki red ima svoje polje i gumb; test ih traži unutar retka (`within(row)`).
+- `Cancel` zove `cancelRequest(id, reason)` s upisanim razlogom (prazan kao `""`). Frontend ne provjerava je li razlog upisan (D3 provjerava backend: 400 `reason must not be blank`).
+- Uspjeh: ponovo `getApprovals()` i `getCancellableRequests()`, pa otkazani zahtjev nestane s popisa. Greška (npr. `reason must not be blank`, `Request has already started`, 403): `alert` s `detail`, kao u T8.
+- Bez zahtjeva: umjesto tablice tekst `No approved requests to cancel.`
+- Ako jedan od dva poziva pri otvaranju padne, tablica koja se učitala ostaje, a tablica koja se nije učitala ne prikazuje se (ni tekst za prazan popis). `alert` je jedan, s `detail` prve greške, i kad padnu oba (L40). Kad padnu oba, prikaže se greška iz `getApprovals()`, bez obzira na to koji poziv prvi odgovori (L41).
+- Nakon uspješnog `Approve` i `Reject` (T8) ponovo se zovu oba popisa, `getApprovals()` i `getCancellableRequests()`, kao nakon `Cancel` (L41).
+- Naslov tablice: `heading` razine 2 `Approved requests`; tablica `Pending requests` dobiva naslov razine 2 `Pending requests`.
+
+### Što testovi mogu provjeriti
+
+Backend (seed T1: Ana vodi Platform s Ivanom, Markom i Petrom, Luka vodi Mobile sa Sarom i Tomom, Eva je admin bez tima):
+
+- Ana vidi Ivanov odobreni zahtjev koji počinje sutra; ne vidi onaj koji počinje danas ili je počeo (Q23), ni Ivanov na čekanju, odbijeni ili otkazani.
+- Ana ne vidi svoj odobreni zahtjev ni Sarin. Luka ne vidi Anin (D2). Eva vidi Ivanov, Sarin i Anin, ne svoj.
+- Ivan dobiva praznu listu. Bez tokena: 401. Redoslijed po `startDate`, pa `id`.
+- Nakon otkazivanja (T6) zahtjev više nije na popisu.
+
+Frontend (lažni `fetch`, kao T8):
+
+- API klijent: `getCancellableRequests` zove `GET /api/approvals/cancellable` s tokenom.
+- Approvals: red s `ownerName` i `Approved by Ana`; `Cancel` šalje razlog iz svog retka; 400 `reason must not be blank` i 409 `Request has already started` se prikažu u `alert`; nakon uspjeha se oba popisa ponovo učitaju i red nestane; prazan popis daje `No approved requests to cancel.`

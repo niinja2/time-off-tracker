@@ -8,12 +8,18 @@ import com.example.timeoff.domain.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 // Cancels requests. Checks 2-6 from interface T6 run in that order; the first failure wins.
 @Service
 public class CancelService {
+
+    private static final Comparator<TimeOffRequest> BY_START_THEN_ID = Comparator
+            .comparing(TimeOffRequest::getStartDate)
+            .thenComparing(TimeOffRequest::getId);
 
     private final UserRepository userRepository;
     private final TimeOffRequestRepository requestRepository;
@@ -50,6 +56,21 @@ public class CancelService {
         return request;
     }
 
+    // Approved requests of others the actor may cancel and that have not started (interface T8.1, L39).
+    @Transactional(readOnly = true)
+    public List<TimeOffRequest> cancellable(Long actorId) {
+        User actor = userRepository.findById(actorId)
+                .orElseThrow();
+
+        return requestRepository.findByStatus(Status.APPROVED)
+                .stream()
+                .filter(request -> !request.isSubmittedBy(actor))
+                .filter(request -> cancelPolicy.canCancel(actor, request))
+                .filter(request -> !hasStarted(request))
+                .sorted(BY_START_THEN_ID)
+                .toList();
+    }
+
     // D14
     private void checkMayCancel(User actor, TimeOffRequest request) {
         if (!cancelPolicy.canCancel(actor, request)) {
@@ -66,14 +87,19 @@ public class CancelService {
         }
     }
 
-    // R7, Q23: a request that starts today has started. The pending state (R6) has no such limit;
-    // terminal states are refused by the request itself (T1).
+    // The pending state (R6) has no such limit; terminal states are refused by the request itself (T1).
     private void checkNotStarted(TimeOffRequest request) {
-        LocalDate today = LocalDate.now(clock);
-        boolean started = request.getStatus() == Status.APPROVED && !request.getStartDate().isAfter(today);
+        boolean started = request.getStatus() == Status.APPROVED && hasStarted(request);
 
         if (started) {
             throw new RuleViolationException("Request has already started");
         }
+    }
+
+    // R7, Q23: a request that starts today has started.
+    private boolean hasStarted(TimeOffRequest request) {
+        LocalDate today = LocalDate.now(clock);
+
+        return !request.getStartDate().isAfter(today);
     }
 }

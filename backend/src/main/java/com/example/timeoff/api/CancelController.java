@@ -5,6 +5,8 @@ import com.example.timeoff.security.CurrentUser;
 import com.example.timeoff.service.CancelService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,6 +33,17 @@ class CancelController {
         TimeOffRequest cancelled = cancelService.cancel(id, actorId, reason);
 
         return RequestView.from(cancelled);
+    }
+
+    // For the Approved requests table on the Approvals screen (interface T8.1).
+    @GetMapping("/approvals/cancellable")
+    List<RequestView> cancellable() {
+        Long actorId = currentUser.id();
+
+        return cancelService.cancellable(actorId)
+                .stream()
+                .map(RequestView::from)
+                .toList();
     }
 
     // Check 1 from interface T6: the shape of the input.
