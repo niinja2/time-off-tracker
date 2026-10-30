@@ -1,0 +1,26 @@
+Title: Time off tracker
+URL: http://localhost:3000/calendar
+Source element: <main>
+---
+Team calendar
+Previous month
+2026-12
+Next month
+Team
+All teams
+Platform
+2026-12-22
+Ivan (Vacation, Approved)
+2026-12-23
+Ivan (Vacation, Approved)
+2026-12-24
+Ivan (Vacation, Approved)
+Petra (Day off, Approved)
+2026-12-28
+Ana (Vacation, Approved)
+2026-12-29
+Ana (Vacation, Approved)
+2026-12-30
+Ana (Vacation, Approved)
+2026-12-31
+Ana (Vacation, Approved)

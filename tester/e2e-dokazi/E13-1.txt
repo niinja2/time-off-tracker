@@ -1,0 +1,12 @@
+Title: Time off tracker
+URL: http://localhost:3000/approvals
+Source element: <main>
+---
+Approvals
+Pending requests
+
+No requests waiting for approval.
+
+Approved requests
+
+No approved requests to cancel.

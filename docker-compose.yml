@@ -16,5 +16,32 @@ services:
       timeout: 3s
       retries: 10
 
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/timeoff
+      SPRING_DATASOURCE_USERNAME: timeoff
+      SPRING_DATASOURCE_PASSWORD: timeoff
+      # No default: Compose stops if .env does not set it (L14).
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (see .env.example)}
+      TZ: Europe/Zagreb
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        API_URL: http://backend:8080
+    depends_on:
+      - backend
+    environment:
+      TZ: Europe/Zagreb
+    ports:
+      - "3000:3000"
+
 volumes:
   db-data:

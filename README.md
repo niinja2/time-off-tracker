@@ -1,0 +1,213 @@
+# Time-off tracker
+
+Employees request time off, team leads approve or reject it, and everyone sees who is away. Spring Boot (Java 21) + Next.js (TypeScript) + PostgreSQL, all in Docker Compose.
+
+The detailed project documents are in Croatian; this README links to them.
+
+## How this was built
+
+The main deliverable is the process: several LLM agents build the code in small, separate tasks,
+and talk only through documents. I own the specification.
+
+**Specification first.** The brief was broken into ~50 atomic questions; the client's answers and
+the decisions D1–D16 became the [specification](docs/zajednicko/specifikacija.md). Features that would
+add logic and conflicts were cut early and listed as extensions. From the spec came the
+[architecture](docs/arhitektura.md) and the [tasks](docs/taskovi.md) (T1–T9, small and separate).
+The [coding rules](docs/pravila-kodiranja.md) were added separately, as my preference:
+code that a human can read and debug easily.
+
+**Roles**, each in its own context: developer, tester (never sees the code), reviewer,
+and an orchestrator that runs the rounds.
+
+**One round per task:**
+1. **Developer writes the interface** for the task: endpoints, fields, screens, error messages.
+   Every unstated assumption goes into the [coding log](docs/zajednicko/coding-log.md) as one entry.
+2. **Tester reads the interface and the assumptions**, answers each one in the log, and raises conflicts.
+   Developer and tester settle them in the log; the specification is the judge.
+3. **Tester writes the tests** from the specification and the interface only, following the
+   [testing methodology](tester/TESTING_METHODOLOGY.md) (so far only partly; the full combination
+   grids are planned). The tests must fail: there is no code yet.
+4. **Developer writes the code** until all tests pass, seeing only the test output, never the test code.
+   A test that looks wrong is not changed: the developer raises it in the log, the tester answers there,
+   and the tester changes the test only if they agree it is wrong (the specification decides).
+5. **Reviewer checks** line, function and whole (coding rules, spec rules, layers),
+   and writes each finding to the log, addressed to the developer or the tester.
+   They answer in the log until the reviewer is satisfied.
+6. **Fixes:** the developer fixes code, the tester fixes tests; all tests must pass again.
+   Then the reviewer reviews again. When there are no findings left, the task is committed.
+
+**Escalation:** the roles settle technical questions themselves. Only behaviour questions
+(the spec has no answer) and disputes after two rounds come to the specification owner.
+
+**Fixed formats:** every hand-off always looks the same, so the next role can read it without guessing:
+interface sections in the same order, test names that carry the rule code (`..._R1`),
+log entries with problem, decision, why and where.
+
+**Checks:** ~530 tests (backend through a real PostgreSQL, frontend screens and API client),
+a review after every task, and happy-path user journeys clicked through in a browser
+(5 chains, 345 checks: [scenarios](tester/e2e-scenariji.md), [report](tester/e2e-izvjestaj.md)).
+Result: 345 of 345 passed, after one wrong check in a scenario was corrected (the app was right).
+The journeys are written so a human can follow them by hand. This first run was done by an LLM (Haiku);
+the next step is a script (Playwright) that runs the same steps on demand or on a schedule.
+
+Details and the role prompts: [way-of-working.md](docs/way-of-working.md).
+
+### Who owns what
+
+- I own the specification: the brief, the client questions and the decisions D1–D16.
+- The coding log owns the code. Every implementation choice (42 entries, a few hundred assumptions)
+  is written there with why and where, and most were settled by the agents themselves.
+  That is why the log is so detailed: it is the documentation a fresh chat or a person needs
+  to change the code safely.
+
+### What the human reads
+
+The brief, the specification with its decisions, and the way of working; plus samples of the
+agents' documents (interface, log entries, test reports). Not the code.
+
+### The general approach
+
+**Rectangular and broad, with atomization.**
+- **Rectangular:** rule following. No messy network of ad-hoc connections: keep the structure organized
+  so conflicts do not happen in the first place. Applied mostly to the LLM way of working
+  (fixed roles, fixed hand-offs, one log), less to the code itself.
+- **Broad:** cover the space of possibilities, to fish out possible faults or inconsistencies.
+- **Atomized decisions:** each one simple to understand, handle and explain.
+- **Generalize:** find the general rule or pattern instead of repeating the same work
+  (e.g. permissions, status changes and visibility are each one decision table, not scattered `if`s).
+- **Offload and surface:** give the LLMs whatever they can do, and make them state their assumptions,
+  so the space of possibilities gets covered.
+
+LLMs excel at simple tasks; as complexity grows, they pay a penalty. The whole point is to atomize
+the work and give the LLMs clear rules and constraints. So this is not one-shotting the application
+from a model: it is a step-by-step, documented process where each LLM has a simple, clear role
+that any other LLM could fill later on. It is not "trust the LLM"; it is the ~530 tests, the review,
+the log and the step-by-step process.
+
+- **Software has no ground truth like ML.** The same spec has many valid implementations, and the
+  client's intent gets lost on the way. That is why the spec and the way of working get most of the attention.
+- **Agreement is not proof.** Similar strong models share blind spots (but so do humans).
+  Next step: mix model versions and add a "breaker" role whose only job is to break the app.
+- **80/20 is for features, never for tests.** Early on the tester followed the developer's list of
+  cases instead of the testing methodology; the tester prompt now says the methodology wins.
+- **Deliberately out:** concurrent requests (about 20 users), public holidays, carry-over,
+  because the way of working showed their complexity rising.
+
+## Run
+
+Needs Docker.
+
+```sh
+cp .env.example .env    # then set JWT_SECRET to a random string of at least 32 bytes
+docker compose up -d --build
+```
+
+- App: http://localhost:3000
+- API: http://localhost:8080/api (also through the frontend at http://localhost:3000/api)
+
+Compose refuses to start without `JWT_SECRET`; there is no default, because a secret committed to the repo would let anyone sign a valid token (L14: no default JWT secret in Docker).
+
+## Test
+
+```sh
+cd backend && ./mvnw test     # needs Docker running (Testcontainers starts PostgreSQL)
+cd frontend && npm ci && npm test
+```
+
+## Seeded users
+
+Type the username on the login form (D10: login is a form, no user picker). The password is `password` for everyone (D16: seed values).
+
+| Username | Role | Team |
+| --- | --- | --- |
+| `ana` | Team lead | Platform |
+| `ivan` | Employee | Platform |
+| `marko` | Employee | Platform |
+| `petra` | Employee | Platform |
+| `luka` | Team lead | Mobile |
+| `sara` | Employee | Mobile |
+| `tom` | Employee (hired 2026-06-01, so 12 vacation days in 2026) | Mobile |
+| `eva` | Admin | none |
+
+Usernames are case-sensitive. The seed has no requests (D9: seed without demo requests).
+
+## API
+
+JWT in `Authorization: Bearer <token>`; errors are `application/problem+json` (D11) with 400 / 401 / 403 / 404 / 409. Full contract: [sucelje.md](docs/zajednicko/sucelje.md).
+
+| Endpoint | What |
+| --- | --- |
+| `POST /api/auth/login` | log in, returns token and user |
+| `GET /api/me`, `GET /api/me/balance` | who I am, my vacation balance |
+| `POST /api/requests` | new request |
+| `POST /api/requests/{id}/approve`, `/reject`, `/cancel` | decide or cancel |
+| `GET /api/approvals` | pending requests I may decide |
+| `GET /api/approvals/cancellable` | approved requests of others I may still cancel |
+| `GET /api/me/requests`, `GET /api/requests`, `GET /api/requests/{id}` | requests I may see |
+| `GET /api/users/{id}/balance` | someone else's balance (lead: own team, admin: all) |
+| `GET /api/calendar?month=yyyy-MM&teamId=`, `GET /api/teams` | team calendar and team filter |
+
+## Decisions and assumptions
+
+- Decisions D1–D16: [specification](docs/zajednicko/specifikacija.md), section 10.
+- Deviations from the brief, based on the client's answers: section 11.
+- Assumptions made while coding: the "pretpostavke" entries in the [coding log](docs/zajednicko/coding-log.md), one per task.
+
+**Why no carry-over (D5).** The brief says 20 days per calendar year (R11), so each year has its own
+20 days and a request uses the balance of the year it falls in. The client's answers describe carry-over:
+unused days move to the next year, are valid until 30 June, and the oldest days are used first.
+That is not one rule but several new pieces of logic (a balance per year of origin, an expiry date,
+an order of use), and each of them collides with rules that already exist:
+
+- a pending request reserves days that may expire before it is decided;
+- cancelling a request must return days to the right year, possibly to days that have already expired;
+- a request across 30 June uses carried days for part of it and new days for the rest;
+- a hire date corrected in the database (D6) changes every balance after it.
+
+Each collision needs its own decision and its own tests. Following 80/20 (D7: brief rules first,
+extensions in the README), carry-over is an extension; the balance calculation is the one place it would go.
+
+Layers and request flow: [architecture](docs/arhitektura.md). Coding rules: [pravila-kodiranja.md](docs/pravila-kodiranja.md). Task list: [taskovi.md](docs/taskovi.md).
+
+## Data corrections
+
+There is no admin screen for data fixes, so corrections are SQL in the database (D6: corrections directly in the database). Connect with:
+
+```sh
+docker compose exec db psql -U timeoff -d timeoff
+```
+
+```sql
+-- Change a hire date (the balance follows it at once)
+UPDATE users SET hire_date = '2026-03-01' WHERE username = 'tom';
+
+-- Add a member to a team
+INSERT INTO team_members (team_id, user_id)
+SELECT t.id, u.id FROM teams t, users u WHERE t.name = 'Mobile' AND u.username = 'ana';
+
+-- Make Ivan the lead of Platform (a lead is also a member of the team, Q3)
+UPDATE teams SET lead_id = (SELECT id FROM users WHERE username = 'ivan') WHERE name = 'Platform';
+
+-- Cancel a request that has already started (the app does not allow it, Q30.1)
+UPDATE time_off_requests
+SET status = 'CANCELLED', cancel_reason = 'Came back early',
+    cancelled_by_id = (SELECT id FROM users WHERE username = 'eva'), cancelled_at = now()
+WHERE id = 7;
+```
+
+## Extensions (not built)
+
+Where each one would go is in the specification, section 9.
+
+- Carry-over of unused days to the next year, valid until 30 June, oldest used first (balance calculation).
+- Croatian public holidays not counted as working days (working-day function).
+- A request across the year boundary stays one request, days counted per year (validation and balance).
+- Sick leave may overlap approved vacation, which then gets refunded (overlap check and balance).
+- L28: show the requester's balance on the Approvals screen (the API already has `GET /api/users/{id}/balance`).
+
+## What's next
+
+- Flow and sequence diagrams for the main rules.
+- The extensions above, starting with carry-over and public holidays.
+- Audit history per request and a notification to the team lead (optional extras from the brief).
+- End-to-end tests against the running Compose stack.

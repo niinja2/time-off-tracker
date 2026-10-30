@@ -1,0 +1,27 @@
+Title: Time off tracker
+URL: http://localhost:3000/my-time-off
+Source element: <main>
+---
+My time off
+Vacation balance 2026
+ENTITLEMENT
+20
+USED
+5
+PENDING
+2
+REMAINING
+13
+Type
+Vacation
+Sick leave
+Day off
+Start date
+End date
+Reason
+Submit request
+Type	Start date	End date	Reason	Status	Comment	Actions
+Vacation	2026-12-14	2026-12-15		Pending		Cancel
+Vacation	2026-12-09	2026-12-10		Cancelled by Ivan
+Sick leave	2026-11-12	2026-11-12		Approved by Ana		Cancel
+Vacation	2026-11-02	2026-11-06	Trip	Approved by Ana	Enjoy	Cancel

@@ -1,0 +1,15 @@
+Title: Time off tracker
+URL: http://localhost:3000/calendar
+Source element: <main>
+---
+Team calendar
+Previous month
+2026-11
+Next month
+Team
+All teams
+Mobile
+2026-11-18
+Sara (Vacation, Approved)
+2026-11-19
+Sara (Vacation, Approved)

@@ -1,0 +1,26 @@
+Title: Time off tracker
+URL: http://localhost:3000/calendar
+Source element: <main>
+---
+Team calendar
+Previous month
+2026-12
+Next month
+Team
+All teams
+Platform
+2026-12-22
+Ivan
+2026-12-23
+Ivan
+2026-12-24
+Ivan
+Petra
+2026-12-28
+Ana
+2026-12-29
+Ana
+2026-12-30
+Ana
+2026-12-31
+Ana

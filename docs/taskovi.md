@@ -24,4 +24,4 @@ Cjelina se može razbiti na manje taskove kad krene rad.
 | T7 | Vidljivost i kalendar | 3 API, 4 Servisi | gotovo |
 | T8 | Frontend, 3 ekrana | 1 Frontend | gotovo |
 | T8.1 | Otkazivanje tuđih zahtjeva kroz UI (L39) | 1 Frontend, 3 API, 4 Servisi | gotovo |
-| T9 | Docker i README; backend u Composeu dobiva `JWT_SECRET` iz `.env` (u `.gitignore`, uz `.env.example`), bez zadane šifre (L14) | | čeka |
+| T9 | Docker i README; backend u Composeu dobiva `JWT_SECRET` iz `.env` (u `.gitignore`, uz `.env.example`), bez zadane šifre (L14) | | gotovo |

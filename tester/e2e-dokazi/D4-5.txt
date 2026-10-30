@@ -1,0 +1,36 @@
+Title: Time off tracker
+URL: http://localhost:3000/calendar
+Source element: <main>
+---
+Team calendar
+Previous month
+2026-12
+Next month
+Team
+All teams
+Mobile
+Platform
+2026-12-01
+Tom (Vacation, Approved)
+2026-12-02
+Tom (Vacation, Approved)
+2026-12-03
+Tom (Vacation, Approved)
+2026-12-04
+Tom (Vacation, Approved)
+2026-12-07
+Tom (Vacation, Approved)
+2026-12-08
+Tom (Vacation, Approved)
+2026-12-09
+Tom (Vacation, Approved)
+2026-12-10
+Tom (Vacation, Approved)
+2026-12-11
+Tom (Vacation, Approved)
+2026-12-14
+Tom (Vacation, Approved)
+2026-12-15
+Tom (Vacation, Approved)
+2026-12-16
+Tom (Vacation, Approved)

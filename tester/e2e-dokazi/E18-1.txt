@@ -1,0 +1,30 @@
+Title: Time off tracker
+URL: http://localhost:3000/approvals
+Source element: <main>
+---
+Approvals
+Pending requests
+
+No requests waiting for approval.
+
+Approved requests
+Employee	Type	Start date	End date	Approved by	Cancel
+Tom	Vacation	2026-12-17	2026-12-31	Luka
+Cancel reason
+Cancel
+
+Ivan	Vacation	2026-12-22	2026-12-24	Ana
+Cancel reason
+Cancel
+
+Petra	Day off	2026-12-24	2026-12-24	Ana
+Cancel reason
+Cancel
+
+Marko	Vacation	2026-12-28	2026-12-30	Ana
+Cancel reason
+Cancel
+
+Ana	Vacation	2026-12-28	2026-12-31	Eva
+Cancel reason
+Cancel
