@@ -316,3 +316,35 @@ Format:
 **Zašto:** Developer i tester se slažu; nema konflikta.
 **Gdje:** kod T5 (bez izmjena sučelja); `ApprovalApiTest.java`: `rejectionWithoutCommentIsBadRequest_R5` (slučaj bez tijela)
 
+## L25 · riješeno · T6 · pretpostavke
+
+**Problem** (developer): Sučelje T6 radi po pretpostavkama koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Vlasnik se gleda prije onoga tko smije odobriti (Ovlasti T6, red 1 prije reda 2). Zato admin otkazuje svoj zahtjev bez razloga (R6, R7: vlasnik otkazuje, razlog opcionalan).
+2. Zahtjev na čekanju smije se otkazati i kad su mu datumi prošli. Specifikacija 4 "počeo" gleda samo kod odobrenih (R7: odobreni zahtjev koji nije počeo).
+3. Kad otkazuje netko tko nije vlasnik, a razloga nema, odgovor je 400 (D3: tko otkazuje tuđi zahtjev mora upisati razlog). Ta se provjera radi nakon ovlasti, jer ovisi o tome tko otkazuje; tko nema pravo, dobiva 403, ne 400.
+4. Razlog se provjerava prije stanja: Ana koja bez razloga otkazuje Ivanov odbijeni zahtjev dobiva 400, ne 409.
+5. Odobreni zahtjev koji je počeo daje 409, `detail` `Request has already started` (R7, Q23: zahtjev koji počinje danas je počeo). Poruka je nova.
+6. Polje u tijelu je `reason` (ne `cancelReason`), najviše 500 znakova kao komentar u T5. Prazan razlog ili samo razmaci sprema se kao `null`.
+7. Novi su `CancelPolicy` (red 2 zove `ApprovalPolicy` iz T5, ne ponavlja pravila) i `CancelService`. Nove iznimke ne trebaju.
+
+- tester: OK: 1–7.
+
+**Odluka:** Svih sedam pretpostavki vrijedi.
+**Zašto:** Developer i tester se slažu; nema konflikta. Pretpostavke 1–5 slijede tablicu otkazivanja u specifikaciji 4 (R6, R7, D3, D14, Q23).
+**Gdje:** sučelje T6 (bez izmjena)
+
+## L26 · riješeno · T6 · pretpostavke
+
+**Problem** (developer): Kod za T6 radi po još nekoliko pretpostavki koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Odobreni zahtjev koji je počeo daje 409 preko postojeće `RuleViolationException`, kao preklapanje (R9) i saldo (R13) u T4 (R7: otkazuje se odobreni zahtjev koji nije počeo; Q23: zahtjev koji počinje danas je počeo).
+2. Razlog se prvo očisti (prazan ili samo razmaci postaje `null`), pa se tek onda provjerava je li obavezan. Voditelj ili admin koji otkazuje tuđi zahtjev s razlogom od samih razmaka dobiva 400, `reason must not be blank` (D3: tko otkazuje tuđi zahtjev mora upisati razlog).
+3. Otkazivanje ima svoj `CancelController`, ne ide u `ApprovalController`; svaki task ima svoj controller, kao T4 i T5.
+4. Ako prijavljeni korisnik nestane iz baze usred poziva, odgovor je 500, kao u T2–T5 (L24 točka 4).
+
+- tester: OK: 1–4. Točku 2 već provjerava `cancellingOthersRequestWithoutReasonIsBadRequest_D3` (slučaj samo s razmacima).
+
+**Odluka:** Sve četiri pretpostavke vrijede.
+**Zašto:** Developer i tester se slažu; nema konflikta.
+**Gdje:** kod T6 (bez izmjena sučelja ni testova)

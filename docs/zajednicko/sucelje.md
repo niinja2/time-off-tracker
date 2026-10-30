@@ -373,3 +373,76 @@ Seed (T1): Ana vodi Platform (Ivan, Marko, Petra), Luka vodi Mobile (Sara, Tom),
 - `GET /api/approvals`: Ana vidi zahtjeve na čekanju Ivana, Marka i Petre, ne svoje, ne Sarine, ne odlučene; Eva vidi sve na čekanju, i svoje; Ivan dobiva praznu listu.
 - Postojeće zahtjeve test sprema sam (repozitorij ili SQL), kao u T3.
 
+## T6 Otkazivanje
+
+Slojevi: 3 API, 4 Servisi (arhitektura). Paketi: `com.example.timeoff.service` za servis, `com.example.timeoff.api` za controller.
+
+### Endpoint
+
+| Metoda i put | Prijava | Tijelo | Odgovor |
+| --- | --- | --- | --- |
+| `POST /api/requests/{id}/cancel` | `Authorization: Bearer <JWT>` | `{ "reason": "Plans changed" }`; tijelo i `reason` nisu obavezni za vlasnika | 200 `<Request>` |
+
+- Otkazivanje bilježi tko je otkazao (`cancelledBy` = prijavljeni korisnik, Q30, Q31) i kada (`cancelledAt` iz `Clock`, D13).
+- Prazan `reason` ili samo razmaci sprema se kao `null`, kao u T4 i T5.
+
+`<Request>` iz T5 dobiva polja: `cancelReason`, `cancelledById`, `cancelledAt`. Dok zahtjev nije otkazan, sva tri su `null`.
+
+`{ "id": 1, "ownerId": 2, "ownerName": "Ivan", "type": "VACATION", "startDate": "2026-11-02", "endDate": "2026-11-06", "reason": "Trip", "status": "CANCELLED", "createdAt": "2026-10-30T09:00:00Z", "decisionComment": "ok", "decidedById": 1, "decidedAt": "2026-10-30T10:00:00Z", "cancelReason": null, "cancelledById": 2, "cancelledAt": "2026-10-31T08:00:00Z" }`
+
+### Ovlasti
+
+Pravila se gledaju redom, prvo koje odgovara odlučuje (specifikacija 4):
+
+| # | Uvjet | Smije | Razlog | Izvor |
+| --- | --- | --- | --- | --- |
+| 1 | otkazuje vlasnik zahtjeva (i admin svoj) | da | opcionalan | R6, R7 |
+| 2 | `ApprovalPolicy.canDecide` (T5) vraća `true` | da | obavezan | Q30, Q31, Q32, D3, D14 |
+| 3 | inače | ne | | D14 |
+
+`CancelPolicy` (Spring komponenta): `canCancel(User actor, TimeOffRequest request)` i `reasonRequired(User actor, TimeOffRequest request)` vraćaju `boolean` po ovoj tablici. Red 2 zove `ApprovalPolicy`, ne ponavlja njegova pravila.
+
+### Provjere
+
+Redom; prva koja padne određuje odgovor. Greške su `application/problem+json`.
+
+| # | Provjera | Status | `detail` |
+| --- | --- | --- | --- |
+| 1 | `id` nije broj; tijelo nije JSON; `reason` dulji od 500 znakova | 400 | koje polje nije ispravno |
+| 2 | Zahtjev s tim `id` ne postoji | 404 | `Request not found` |
+| 3 | Korisnik ne smije otkazati (Ovlasti) | 403 | `You cannot cancel this request` |
+| 4 | Otkazuje netko tko nije vlasnik, bez `reason`, s praznim ili samo s razmacima (D3) | 400 | `reason must not be blank` |
+| 5 | Zahtjev je `APPROVED` i počeo je: `startDate` je danas ili ranije (R7, Q23, Q30.1, Q31.1) | 409 | `Request has already started` |
+| 6 | Zahtjev je `REJECTED` ili `CANCELLED` | 409 | `Request cannot change from X to Y` (iz `InvalidStatusTransitionException`, T1) |
+
+- Provjera 1 je API (oblik ulaza); 2–6 servis. Provjera 4 je u servisu jer ovisi o tome tko otkazuje.
+- "Danas" je `LocalDate.now(clock)` (T3).
+- Zahtjev na čekanju smije se otkazati i kad su mu datumi prošli: specifikacija 4 "počeo" gleda samo kod odobrenih.
+
+### Servis
+
+`CancelService` (Spring servis), u transakciji:
+
+| Metoda | Vraća | Radi |
+| --- | --- | --- |
+| `cancel(Long requestId, Long actorId, String reason)` | `TimeOffRequest` | provjere 2–6, pa `request.cancel(actor, reason, now)` |
+
+Iznimke su postojeće: `NotFoundException` (404), `ForbiddenException` (403), `InvalidRequestException` (400), `RuleViolationException` (409), `InvalidStatusTransitionException` (409).
+
+### Što testovi mogu provjeriti
+
+Seed (T1): Ana vodi Platform (Ivan, Marko, Petra), Luka vodi Mobile (Sara, Tom), Eva je admin bez tima.
+
+- R6: Ivan otkazuje svoj zahtjev na čekanju bez tijela: 200, `CANCELLED`, `cancelledById` Ivana, `cancelledAt` iz sata, `cancelReason` `null`.
+- R7: Ivan otkazuje svoj odobreni zahtjev koji počinje sutra: 200. Koji počinje danas ili je počeo: 409.
+- Q30, D3: Ana otkazuje Ivanov zahtjev s razlogom: 200, `cancelReason`; bez razloga ili s praznim: 400.
+- Q31, Q32: Eva otkazuje Sarin odobreni zahtjev koji nije počeo, s razlogom: 200.
+- Q30.1, Q31.1: Ana ili Eva otkazuju Ivanov odobreni zahtjev koji je počeo: 409.
+- Eva otkazuje svoj zahtjev bez razloga: 200 (vlasnik, red 1).
+- D14: Luka ne smije Ivanov zahtjev: 403. Marko ne smije Ivanov: 403. Anin zahtjev Luka ne smije: 403.
+- Odbijeni ili otkazani zahtjev: 409.
+- Zahtjev na čekanju iz prošlosti vlasnik smije otkazati: 200.
+- Saldo: nakon otkazivanja godišnji više ne ulazi u `used` ni `pending` (T3).
+- Nepostojeći `id`: 404. Bez tokena: 401.
+- Redoslijed: Luka otkazuje Ivanov zahtjev bez razloga: 403 (ovlasti prije razloga); Ana otkazuje Ivanov odbijeni zahtjev bez razloga: 400 (razlog prije stanja).
+- Postojeće zahtjeve test sprema sam (repozitorij ili SQL), kao u T3.
