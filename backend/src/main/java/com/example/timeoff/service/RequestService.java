@@ -51,7 +51,7 @@ public class RequestService {
         checkNoOverlap(owner, start, end);
         checkBalance(userId, command);
 
-        String reason = normalizedReason(command.reason());
+        String reason = Texts.blankToNull(command.reason());
         Instant now = clock.instant();
         TimeOffRequest request = new TimeOffRequest(
                 owner,
@@ -123,14 +123,5 @@ public class RequestService {
                     "Not enough vacation days: requested " + requested + ", remaining " + remaining
             );
         }
-    }
-
-    // A blank reason is stored as no reason (L21, point 3).
-    private String normalizedReason(String reason) {
-        if (reason == null || reason.isBlank()) {
-            return null;
-        }
-
-        return reason;
     }
 }

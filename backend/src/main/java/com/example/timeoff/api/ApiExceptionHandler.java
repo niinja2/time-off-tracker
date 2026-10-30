@@ -2,7 +2,9 @@ package com.example.timeoff.api;
 
 import com.example.timeoff.domain.InvalidStatusTransitionException;
 import com.example.timeoff.security.InvalidLoginException;
+import com.example.timeoff.service.ForbiddenException;
 import com.example.timeoff.service.InvalidRequestException;
+import com.example.timeoff.service.NotFoundException;
 import com.example.timeoff.service.RuleViolationException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,6 +33,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidStatusTransitionException.class)
     ProblemDetail invalidStatusTransition(InvalidStatusTransitionException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    ProblemDetail notFound(NotFoundException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    ProblemDetail forbidden(ForbiddenException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 
     @ExceptionHandler(InvalidRequestException.class)

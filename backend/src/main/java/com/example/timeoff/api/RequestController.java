@@ -1,6 +1,5 @@
 package com.example.timeoff.api;
 
-import com.example.timeoff.domain.Status;
 import com.example.timeoff.domain.TimeOffRequest;
 import com.example.timeoff.domain.TimeOffType;
 import com.example.timeoff.security.CurrentUser;
@@ -9,7 +8,6 @@ import com.example.timeoff.service.RequestService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.time.Instant;
 import java.time.LocalDate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,33 +51,5 @@ class RequestController {
             @NotNull LocalDate endDate,
             @Size(max = 500) String reason
     ) {
-    }
-
-    record RequestView(
-            Long id,
-            Long ownerId,
-            TimeOffType type,
-            LocalDate startDate,
-            LocalDate endDate,
-            String reason,
-            Status status,
-            Instant createdAt
-    ) {
-
-        static RequestView from(TimeOffRequest request) {
-            Long ownerId = request.getOwner()
-                    .getId();
-
-            return new RequestView(
-                    request.getId(),
-                    ownerId,
-                    request.getType(),
-                    request.getStartDate(),
-                    request.getEndDate(),
-                    request.getReason(),
-                    request.getStatus(),
-                    request.getCreatedAt()
-            );
-        }
     }
 }

@@ -286,3 +286,90 @@ Iznimke (paket `com.example.timeoff.service`), API ih pretvara u statuse:
 - Saldo se računa za godinu `startDate`, ne tekuću: godišnji u 2027. troši saldo 2027.
 - Datum u prošlosti (npr. 2026-01-05) je dopušten.
 - Postojeće zahtjeve test sprema sam (repozitorij ili SQL), kao u T3.
+
+## T5 Odobravanje i odbijanje
+
+Slojevi: 3 API, 4 Servisi (arhitektura). Paketi: `com.example.timeoff.service` za servis, pravilo ovlasti i iznimke, `com.example.timeoff.api` za controller.
+
+### Endpointi
+
+| Metoda i put | Prijava | Tijelo | Odgovor |
+| --- | --- | --- | --- |
+| `POST /api/requests/{id}/approve` | `Authorization: Bearer <JWT>` | `{ "comment": "ok" }`; tijelo i `comment` nisu obavezni | 200 `<Request>` |
+| `POST /api/requests/{id}/reject` | `Authorization: Bearer <JWT>` | `{ "comment": "Busy week" }`; `comment` obavezan | 200 `<Request>` |
+| `GET /api/approvals` | `Authorization: Bearer <JWT>` | nema | 200 `[<Request>, ...]` |
+
+- `GET /api/approvals`: zahtjevi na čekanju koje prijavljeni korisnik smije odobriti (Ovlasti, ispod), poredani po `startDate`, pa po `id`. Za ekran Approvals (specifikacija 12). Tko ne smije odobriti ništa, dobiva praznu listu, ne 403.
+- Odluka bilježi tko je odlučio (`decidedBy` = prijavljeni korisnik, Q46) i kada (`decidedAt` iz `Clock`, D13).
+- Prazan `comment` ili samo razmaci kod odobrenja sprema se kao `null`, kao `reason` u T4.
+
+`<Request>` iz T4 dobiva polja: `ownerName`, `decisionComment`, `decidedById`, `decidedAt`. Dok zahtjev nije odlučen, zadnja tri su `null`.
+
+`{ "id": 1, "ownerId": 2, "ownerName": "Ivan", "type": "VACATION", "startDate": "2026-11-02", "endDate": "2026-11-06", "reason": "Trip", "status": "APPROVED", "createdAt": "2026-10-30T09:00:00Z", "decisionComment": "ok", "decidedById": 1, "decidedAt": "2026-10-30T10:00:00Z" }`
+
+### Ovlasti
+
+Tko smije odobriti ili odbiti zahtjev. Pravila se gledaju redom, prvo koje odgovara odlučuje:
+
+| # | Uvjet | Smije | Izvor |
+| --- | --- | --- | --- |
+| 1 | odlučuje admin | da, bilo koji zahtjev, i vlastiti, bilo kojeg tipa | R2, Q1.1, D15 |
+| 2 | odlučuje vlasnik zahtjeva | ne | R3 |
+| 3 | vlasnik je voditelj (vodi barem jedan tim) | ne; ide adminu, i kad je član tuđeg tima | R3, D2 |
+| 4 | odlučuje voditelj tima u kojem je vlasnik član | da; dovoljan je bilo koji od tih timova | R1, Q3, Q5.1 |
+| 5 | inače | ne; npr. vlasnik bez tima ide adminu | Q4 |
+
+`ApprovalPolicy` (Spring komponenta): `canDecide(User actor, TimeOffRequest request)` vraća `boolean` po ovoj tablici. Isto pravilo koristi T6 za otkazivanje (D14: tko smije odobriti, smije i otkazati).
+
+### Provjere
+
+Redom; prva koja padne određuje odgovor. Greške su `application/problem+json`.
+
+| # | Provjera | Status | `detail` |
+| --- | --- | --- | --- |
+| 1 | `id` nije broj; tijelo nije JSON; `comment` dulji od 500 znakova | 400 | koje polje nije ispravno |
+| 2 | Odbijanje bez `comment`, s praznim ili samo s razmacima (R5: odbijanje traži komentar) | 400 | `comment must not be blank` |
+| 3 | Zahtjev s tim `id` ne postoji | 404 | `Request not found` |
+| 4 | Korisnik ne smije odlučiti (Ovlasti) | 403 | `You cannot approve or reject this request` |
+| 5 | Zahtjev nije `PENDING` (R4: odobrava se i odbija samo zahtjev na čekanju) | 409 | `Request cannot change from X to Y` (iz `InvalidStatusTransitionException`, T1) |
+
+- Provjere 1 i 2 radi API (oblik ulaza); 3–5 servis.
+- Datumi zahtjeva se ne gledaju: zahtjev na čekanju smije se odobriti i kad su mu datumi prošli (Q35), i ne istječe (Q36).
+- Kod odobrenja se preklapanje i saldo ne provjeravaju ponovo: zahtjev na čekanju ih je prošao pri kreiranju i već troši saldo (R9, R13).
+
+### Servis
+
+`ApprovalService` (Spring servis), svaka metoda u svojoj transakciji:
+
+| Metoda | Vraća | Radi |
+| --- | --- | --- |
+| `approve(Long requestId, Long actorId, String comment)` | `TimeOffRequest` | provjere 3–5, pa `request.approve(actor, comment, now)` |
+| `reject(Long requestId, Long actorId, String comment)` | `TimeOffRequest` | provjere 3–5, pa `request.reject(actor, comment, now)` |
+| `pending(Long actorId)` | `List<TimeOffRequest>` | zahtjevi `PENDING` za koje `canDecide` vraća `true`, poredani kao gore |
+
+Nove iznimke (paket `com.example.timeoff.service`), API ih pretvara u statuse:
+
+| Iznimka | Status |
+| --- | --- |
+| `NotFoundException` | 404 |
+| `ForbiddenException` | 403 |
+
+### Što testovi mogu provjeriti
+
+Seed (T1): Ana vodi Platform (Ivan, Marko, Petra), Luka vodi Mobile (Sara, Tom), Eva je admin bez tima.
+
+- R1: Ana odobrava i odbija Ivanov zahtjev: 200, `status`, `decidedById` Ane, `decidedAt` iz sata, `decisionComment`.
+- R1: Luka ne smije Ivanov zahtjev: 403. Ivan ne smije Markov: 403.
+- R2: Eva odobrava Ivanov i Sarin zahtjev: 200.
+- R3: Ivan ne smije svoj zahtjev: 403. Ana ne smije svoj: 403.
+- R3, D2: Anin zahtjev Luka ne smije: 403; Eva smije: 200.
+- Q1.1, D15: Eva odobrava svoj zahtjev, i godišnji i bolovanje: 200.
+- Q4: zahtjev korisnika bez tima (osim Eve test može napraviti korisnika bez tima SQL-om) smije samo admin.
+- R4: odobrenje ili odbijanje zahtjeva koji je `APPROVED`, `REJECTED` ili `CANCELLED`: 409.
+- R5: odbijanje bez `comment` ili s praznim: 400; odobrenje bez tijela: 200, `decisionComment` `null`.
+- Q35: zahtjev na čekanju iz prošlosti se smije odobriti: 200.
+- Nepostojeći `id`: 404. Bez tokena: 401.
+- Redoslijed: Luka odbija nepostojeći zahtjev bez komentara: 400 (provjera 2 prije 3); Luka odobrava Ivanov već odobreni zahtjev: 403 (ovlasti prije stanja).
+- `GET /api/approvals`: Ana vidi zahtjeve na čekanju Ivana, Marka i Petre, ne svoje, ne Sarine, ne odlučene; Eva vidi sve na čekanju, i svoje; Ivan dobiva praznu listu.
+- Postojeće zahtjeve test sprema sam (repozitorij ili SQL), kao u T3.
+

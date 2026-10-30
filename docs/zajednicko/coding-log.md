@@ -280,3 +280,39 @@ Format:
 **Odluka:** Tijelo odgovora i pročitani tip izdvojeni su u varijable s imenom na oba mjesta.
 **Zašto:** Pravilo "Ugniježđeni pozivi razbijaju se u varijable s imenom."; kod debugiranja se vide tijelo odgovora i pročitani tip.
 **Gdje:** `RequestApiTest.java`: `sickLeaveRequestIsCreated_T4` i `dayOffRequestIsCreated_T4` (`body`, `type`)
+
+## L23 · riješeno · T5 · pretpostavke
+
+**Problem** (developer): Sučelje T5 radi po pretpostavkama koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Popis za odobravanje (`GET /api/approvals`) je u T5, a ne u T7 (Vidljivost), jer ga određuje pravo odobravanja (Ovlasti), a ne pravila vidljivosti.
+2. Tko ne smije odobriti nijedan zahtjev, dobiva praznu listu, ne 403.
+3. Zahtjev koji postoji, ali ga korisnik ne smije odlučiti, daje 403, ne 404. Tako korisnik sazna da zahtjev postoji, ali specifikacija 8 razlikuje 403 (nema pravo) i 404 (ne postoji).
+4. Ovlasti se provjeravaju prije stanja: tko nema pravo, dobiva 403 i kad zahtjev više nije na čekanju.
+5. Kod odobrenja se preklapanje (R9) i saldo (R13) ne provjeravaju ponovo: zahtjev na čekanju ih je prošao pri kreiranju i već troši saldo. Iznimka bi bila ručna izmjena baze (D6: korekcije se rade izravno u bazi).
+6. Za zahtjev koji nije na čekanju `detail` je poruka iz domene (T1), npr. "Request cannot change from APPROVED to APPROVED".
+7. Prazan komentar kod odobrenja sprema se kao `null`, kao `reason` u T4.
+8. `<Request>` dobiva `ownerName`, da ekran Approvals ne mora posebno tražiti imena. To polje se pojavljuje i u odgovoru `POST /api/requests` iz T4.
+
+- tester: OK: 1–8. Uz 7 jedno pitanje: vrijedi li isto za odbijanje? Pretpostavljam da prazan komentar (ili samo razmaci) znači da komentara nema, pa odbijanje pada (R5: odbijanje traži komentar). Tako bih testirao; neka developer potvrdi.
+- developer: potvrđujem. Prazan komentar ili samo razmaci znači da komentara nema; odbijanje tada pada s 400, `comment must not be blank`. Dopisano u sučelje T5, Provjere, red 2.
+
+**Odluka:** Svih osam pretpostavki vrijedi. Kod odbijanja prazan komentar ili samo razmaci znači da komentara nema: 400.
+**Zašto:** Developer i tester se slažu; komentar od samih razmaka ne objašnjava odbijanje (R5: odbijanje traži komentar).
+**Gdje:** sučelje T5, Provjere, red 2
+
+## L24 · riješeno · T5 · pretpostavke
+
+**Problem** (developer): Kod za T5 radi po još nekoliko pretpostavki koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Odbijanje bez ikakvog tijela pada isto kao odbijanje bez komentara: 400, `comment must not be blank` (R5: odbijanje traži komentar).
+2. `GET /api/approvals` čita sve zahtjeve na čekanju iz baze, a u Javi bira one koje korisnik smije odobriti. Za POC od oko 20 korisnika (Q53.1) to je dovoljno; kod puno podataka filtriranje bi se selilo u SQL (arhitektura, Napomene).
+3. Kad `id` u adresi nije broj, status je 400, a `detail` je Springova zadana poruka, npr. "Failed to convert 'id' ...".
+4. Ako prijavljeni korisnik nestane iz baze usred poziva, odgovor je 500, kao u T2 i T3 (L14 točka 3, L19 točka 4).
+
+- tester: OK: 1–4. Uz 1 sam dodao slučaj "odbijanje bez tijela" u `rejectionWithoutCommentIsBadRequest_R5`, jer to ponašanje nijedan test nije provjeravao. Uz 3 test provjerava samo status 400, ne tekst poruke.
+
+**Odluka:** Sve četiri pretpostavke vrijede.
+**Zašto:** Developer i tester se slažu; nema konflikta.
+**Gdje:** kod T5 (bez izmjena sučelja); `ApprovalApiTest.java`: `rejectionWithoutCommentIsBadRequest_R5` (slučaj bez tijela)
+
