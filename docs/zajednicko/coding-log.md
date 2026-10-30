@@ -419,3 +419,105 @@ Format:
 **Odluka:** Dodani testovi da voditelj u timu u kojem je samo član vidi isto što i zaposlenik.
 **Zašto:** Specifikacija 7 (voditelj za ostale timove u kojima je član vidi isto što i zaposlenik), Q47 (kolege bez tipa i bez zahtjeva na čekanju); bez testa bi prošao kod koji voditelju daje pun pristup u svakom svom timu.
 **Gdje:** `CalendarApiTest.java`: `anaInMobileSeesSaraOnlyApprovedWithoutTypeAndStatus_Q47`; `VisibilityApiTest.java`: `anaInMobileCannotSeeSarasRequestsOrBalance_Q47`
+
+## L31 · riješeno · T8 · pretpostavke
+
+**Problem** (developer): Sučelje T8 radi po pretpostavkama koje specifikacija ne kaže. Neka se potvrde ili isprave:
+
+1. Frontend ništa ne provjerava sam (prazna polja, datumi, komentar kod odbijanja, je li odobreni zahtjev počeo); sve šalje backendu i prikaže `detail` greške (arhitektura, sloj 1: frontend ne odlučuje ništa; specifikacija 12: ekran prikazuje poruku greške).
+2. Token je u `localStorage` (`timeoff.token`). Tko je prijavljen i koje uloge ima, frontend čita s `GET /api/me` kod svakog otvaranja stranice, ne sprema ga, pa izmjena u bazi vrijedi odmah (D6: korekcije se rade izravno u bazi).
+3. Odjava samo zaboravi token (T2: odjava ne postoji na serveru). Na 401 iz bilo kojeg poziva osim prijave token se briše i korisnik ide na `/login`, bez poruke.
+4. Poveznicu Approvals vide samo voditelji i admini (specifikacija 12). Tko ručno otvori `/approvals`, dobije praznu listu iz backenda, ne posebnu poruku ni preusmjeravanje.
+5. Na My time off gumb Cancel postoji za zahtjeve na čekanju i odobrene; otkazivanje tuđih zahtjeva (voditelj, admin) nema ekran (vidi L33).
+6. Kalendar prikazuje samo dane s barem jednom odsutnošću, od ponedjeljka do petka, unutar odabranog mjeseca; mjesec se mijenja gumbima prethodni/sljedeći, početni je tekući mjesec po satu preglednika.
+7. Datumi se prikazuju kako ih vrati API (`yyyy-MM-dd`); tip i stanje engleskim riječima (Q54: sve na engleskom).
+8. Stupac Comment na My time off pokazuje komentar odluke, a ako ga nema, razlog otkazivanja.
+9. Frontend zove API relativnim putem (`/api/...`), a Next.js ga prosljeđuje backendu, pa backend ne treba CORS. Adresa backenda je varijabla `API_URL` (za Docker u T9).
+10. Frontend testovi su u `frontend/tests/` (Vitest, React Testing Library, jsdom) i ne trebaju backend: odgovore daje lažni `fetch`. Tester za T8 zato treba vidjeti i `frontend/tests/`, ne samo `backend/src/test/` (za Rajka).
+    - orkestrator (Rajko pregledava): da, tester čita i piše `frontend/tests/`; `frontend/src/` ne otvara, isto kao `backend/src/main`.
+11. `@types/node` je podignut s 20 na 22, jer ga Vitest traži, a lokalni Node je 22.
+
+- tester: 1: OK, arhitektura sloj 1 i specifikacija 12 (ekran prikazuje poruku greške); test: prazna forma za prijavu i za novi zahtjev šalje prazne vrijednosti i prikaže `detail`.
+- tester: 2: OK, D6 (izmjena u bazi vrijedi odmah); test: `AppShell` zove `GET /api/me` kod svakog otvaranja.
+- tester: 3: OK, T2 (odjava ne postoji na serveru); test: `Log out` ne zove backend, 401 briše token i ide na `/login` bez `alert`.
+- tester: 4: OK, specifikacija 12 i specifikacija 7 (skrivanje u frontendu se ne računa, API provodi pravila).
+- tester: 5: OK, R6, R7 (vlasnik otkazuje na čekanju i odobren); L33 (tuđi zahtjevi samo u API-ju).
+- tester: 6: OK, R10 (vikendi se ne broje), specifikacija 12 (popis po danima); test: prijelaz godine kod prethodnog i sljedećeg mjeseca.
+- tester: 7: OK, Q54 (sve na engleskom).
+- tester: 8: OK, specifikacija 7 (zaposlenik vidi komentar odluke); test: komentar odluke ima prednost pred razlogom otkazivanja.
+- tester: 9: OK, nema utjecaja na testove (lažni `fetch` gleda relativan put).
+- tester: 10: OK, testovi su u `frontend/tests/`, ne trebaju backend.
+- tester: 11: OK, nema utjecaja na testove.
+
+**Odluka:** Svih jedanaest pretpostavki vrijedi.
+**Zašto:** Developer i tester se slažu; sve se slaže sa specifikacijom 7 i 12, arhitekturom (sloj 1: frontend ne odlučuje) i odlukama L28, L32, L33.
+**Gdje:** sučelje T8 (bez izmjena); testovi u `frontend/tests/`
+
+## L32 · odlučeno (orkestrator, Rajko pregledava) · T8 · Q46, Q30, Q31, specifikacija 7
+
+**Problem** (developer): Specifikacija 7 kaže da zaposlenik vidi svoje zahtjeve "uključujući tko je odlučio i tko je otkazao" (Q46: tko je odlučio; Q30, Q31: tko je otkazao). API (T5, T6) za to vraća samo broj korisnika (`decidedById`, `cancelledById`), ne ime, pa ekran My time off ne može napisati "Approved by Ana". Pitanje: treba li My time off prikazati ime onoga tko je odlučio ili otkazao? Ako da, backend bi u `<Request>` dodao `decidedByName` i `cancelledByName` (kao `ownerName` u T5); ako ne, ekran to ne prikazuje, a podatak ostaje u API-ju. Dok se ne odluči, sučelje T8 to ne prikazuje.
+
+**Odluka:** Da. My time off prikazuje ime onoga tko je odlučio i tko je otkazao. Backend u `<Request>` dodaje `decidedByName` i `cancelledByName` (null kad ih nema), kao `ownerName` u T5.
+**Zašto:** Specifikacija 7 izričito kaže da zaposlenik vidi tko je odlučio i tko je otkazao (Q46, Q30, Q31); broj korisnika to ne pokazuje. Promjena je mala i u postojećem `<Request>`.
+**Gdje:** sučelje T7 `<Request>` (dva nova polja), sučelje T8 My time off; backend test i frontend test (tester)
+
+## L33 · odlučeno (orkestrator, Rajko pregledava) · T8 · specifikacija 4, specifikacija 12, Q30, Q31, Q32, D14
+
+**Problem** (developer): Voditelj i admin smiju otkazati tuđi zahtjev, uz razlog (specifikacija 4; Q30, Q31, Q32: voditelj i admin otkazuju; D14: tko smije odobriti, smije i otkazati). Specifikacija 12 ne daje im za to ekran: Approvals ima samo zahtjeve na čekanju s odobravanjem i odbijanjem, a My time off samo vlastite. Pitanje: treba li frontend ponuditi otkazivanje tuđih zahtjeva (npr. odobrenih) ili to ostaje samo u API-ju (`POST /api/requests/{id}/cancel`)? Dok se ne odluči, sučelje T8 ga nema (80/20).
+
+**Odluka:** Ne. Otkazivanje tuđih zahtjeva ostaje samo u API-ju (`POST /api/requests/{id}/cancel`); frontend ga nema.
+**Zašto:** Specifikacija 12 za to ne daje ekran; 80/20. Ekran za to je proširenje za README.
+**Gdje:** sučelje T8 (bez promjene)
+
+## L34 · riješeno · T8 · pretpostavke
+
+**Problem** (developer): Kod za T8 radi po još nekoliko pretpostavki koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Adresa backenda (`API_URL`) čita se kad se frontend gradi (`npm run build`), ne kad se pokrene; Next.js tada upiše proslijeđivanje `/api` u build. Za Docker (T9) `API_URL` zato mora biti zadan već kod gradnje slike.
+2. Dok se ne učita `GET /api/me`, `AppShell` ne prikazuje ništa (ni navigaciju ni ekran); ako `GET /api/me` padne s greškom koja nije 401, prikaže se samo `alert` s `detail`.
+3. Kalendar piše `No absences this month.` i kad unosi postoje, ali u tom mjesecu padaju samo na subotu i nedjelju (npr. zahtjev od petka do ponedjeljka preko granice mjeseca), jer se vikendi ne prikazuju (R10).
+4. Kad se na Approvals odluči jedan zahtjev, komentari upisani u druge retke ostaju; na My time off otvoreno polje `Cancel reason` zatvori se tek nakon uspješnog otkazivanja ili klika na `Keep request`.
+5. Mrežna greška (backend ne radi) prikaže se kao `alert` `Cannot reach the server` na svakom ekranu, i na prijavi.
+6. Fontovi s Google Fontsa (iz predloška Next.js) su izbačeni, jer bi `npm run build` bez interneta pao; koristi se sistemski font.
+
+- tester: 1: OK, tiče se T9 (Docker); frontend testovi ne ovise o `API_URL` (lažni `fetch` gleda relativan put).
+- tester: 2: OK, sučelje T8 (Greška: `detail` u `alert`); test: `GET /api/me` s 500 prikaže samo `alert`, bez navigacije i ekrana.
+- tester: 3: OK, R10 (vikendi se ne prikazuju); test ne treba.
+- tester: 4: OK, sučelje T8 ne traži drugačije; test ne treba.
+- tester: 5: OK, sučelje T8 (API klijent: mrežna greška daje `Cannot reach the server`); test: prijava kad backend ne radi prikaže tu poruku u `alert`.
+- tester: 6: OK, nema utjecaja na testove.
+
+**Odluka:** Svih šest pretpostavki vrijedi.
+**Zašto:** Developer i tester se slažu; sve se slaže sa specifikacijom 12 i sučeljem T8, nema konflikta. Točke 2 i 5 su ponašanje koje nijedan test nije provjeravao, pa su dodani testovi.
+**Gdje:** kod T8 (bez izmjena sučelja); `frontend/tests/AppShell.test.tsx`: `other error from /api/me shows only the alert, without navigation or screen (L34.2)`; `frontend/tests/LoginScreen.test.tsx`: `network error shows Cannot reach the server (L34.5)`
+
+## L35 · riješeno · T8 · pravila kodiranja (Stil 1)
+
+**Problem** (reviewer, važno, za developera): Funkcija koja slaže radne dane mjeseca za kalendar ima petlju, a u petlji `if`, dakle dvije razine gniježđenja. Mjesto: `workingDaysOfMonth` u `frontend/src/lib/month.ts` (redovi 34–40, `for` pa `if (!isWeekend)`). Pravilo: "Najviše jedna razina gniježđenja. Ako bi trebalo dvije, razbij kod u međukorake ili rane izlaze." Npr. prvo popis svih dana mjeseca, pa `filter` koji izbaci vikende.
+
+- developer: slažem se; sada je prvo popis svih dana mjeseca, pa `filter` izbaci vikende (mala funkcija `isWeekend`), bez petlje s `if`-om.
+
+**Odluka:** Petlja s `if`-om zamijenjena popisom dana i `filter`-om; provjera vikenda je u svojoj funkciji.
+**Zašto:** Pravilo "Najviše jedna razina gniježđenja. Ako bi trebalo dvije, razbij kod u međukorake ili rane izlaze."
+**Gdje:** `frontend/src/lib/month.ts`: `workingDaysOfMonth`, `isWeekend`
+
+## L36 · riješeno · T8 · pravila kodiranja (Stil 2)
+
+**Problem** (reviewer, važno, za testera): U `frontend/tests/MyTimeOffScreen.test.tsx` poziv je na više mjesta ugniježđen tri razine duboko, pa se kod debugiranja ne vidi koji je element pronađen: `within(form())` stoji unutar `fireEvent.change(...)`, `user.type(...)`, `user.click(...)` ili `expect(...)`, npr. `fireEvent.change(within(form()).getByLabelText("Start date"), ...)`. Mjesta: redovi 189–192, 200–203, 216, 233–236 i 239–241. Isti uzorak kao u L20. Pravilo: "Ugniježđeni pozivi razbijaju se u varijable s imenom." Npr. polja forme prvo u varijable (`startDate`, `reason`, `submit`), pa tek onda radnja ili provjera.
+
+- tester: slažem se; polja forme sada daje pomoćna funkcija `formFields()` kao varijable s imenom (`type`, `startDate`, `endDate`, `reason`, `submit`), pa radnja i provjera dobivaju gotov element; popravljena su sva navedena mjesta i `submit` u testu "error stays until the next action succeeds".
+
+**Odluka:** Polja forme izdvojena su u varijable s imenom prije radnje ili provjere.
+**Zašto:** Pravilo "Ugniježđeni pozivi razbijaju se u varijable s imenom."; kod debugiranja se vidi koji je element pronađen.
+**Gdje:** `frontend/tests/MyTimeOffScreen.test.tsx`: `formFields()` umjesto `form()`; testovi u `new request form (T4)`
+
+## L37 · riješeno · T8 · sučelje T8 (Rute, Komponente)
+
+**Problem** (reviewer, važno, za developera pa testera): Početna adresa `/` nema nijedan test. Sučelje T8 (Rute) kaže da ona samo preusmjerava: s tokenom na `/my-time-off`, bez tokena na `/login`. Ako se to pokvari, tko otvori aplikaciju na početnoj adresi vidi praznu stranicu. Tester to ne može testirati jer sučelje (Komponente) ne navodi komponentu za `/`; u kodu je to `HomeRedirect` (`frontend/src/components/HomeRedirect.tsx`). Prijedlog: developer dopiše `HomeRedirect` u tablicu Komponente, a tester doda test za oba slučaja (s tokenom i bez njega).
+
+- developer: slažem se; `HomeRedirect` je dopisan u sučelje T8, tablica Komponente: s tokenom `router.replace("/my-time-off")`, bez tokena `router.replace("/login")`, bez poziva API-ja. Test je na testeru.
+- tester: slažem se; dodana su dva testa: s tokenom ide na `/my-time-off`, bez tokena na `/login`, u oba slučaja bez poziva API-ja.
+
+**Odluka:** `HomeRedirect` je u sučelju T8 (Komponente) i ima test za oba slučaja.
+**Zašto:** Sučelje T8 (Rute): `/` samo preusmjerava; bez testa bi pokvareno preusmjeravanje ostavilo praznu početnu stranicu.
+**Gdje:** sučelje T8, Komponente (`HomeRedirect`); `frontend/tests/HomeRedirect.test.tsx`: `with token goes to My time off without calling the API (L37)`, `without token goes to login without calling the API (L37)`

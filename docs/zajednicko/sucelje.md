@@ -470,6 +470,10 @@ Slojevi: 3 API, 4 Servisi (arhitektura). Paketi: `com.example.timeoff.service` z
 - `teamId`: ostaju samo unosi čiji je vlasnik član tog tima; vidljivost se ne mijenja. Tim u kojem prijavljeni ne vidi nikoga, ili tim koji ne postoji, daje praznu listu.
 - `GET /api/teams`: admin dobiva sve timove; ostali timove u kojima su član (voditelj je član timova koje vodi, Q3). Poredani po `name`.
 
+`<Request>` iz T6 dobiva polja `decidedByName` i `cancelledByName`: ime (`name`) korisnika iz `decidedById` i `cancelledById`, `null` dok zahtjev nije odlučen, odnosno otkazan (L32; specifikacija 7: zaposlenik vidi tko je odlučio i tko je otkazao, Q46, Q30, Q31). Vrijedi za svaki odgovor koji vraća `<Request>` (T4–T7).
+
+`{ "id": 1, "ownerId": 2, "ownerName": "Ivan", "type": "VACATION", "startDate": "2026-11-02", "endDate": "2026-11-06", "reason": "Trip", "status": "CANCELLED", "createdAt": "2026-10-30T09:00:00Z", "decisionComment": "ok", "decidedById": 1, "decidedByName": "Ana", "decidedAt": "2026-10-30T10:00:00Z", "cancelReason": "Reorg", "cancelledById": 8, "cancelledByName": "Eva", "cancelledAt": "2026-10-31T08:00:00Z" }`
+
 `<CalendarEntry>`, dva oblika:
 
 | Pristup | Polja | Primjer |
@@ -565,3 +569,234 @@ Seed (T1): Ana vodi Platform (Ivan, Marko, Petra), Luka vodi Mobile (Sara, Tom),
 - Više timova (test SQL-om doda Saru u Platform): Ivan vidi Sarin odobreni zahtjev jednom, `LIMITED`; Ana ga vidi `FULL`.
 - Voditelj u tuđem timu (test SQL-om doda Anu u Mobile): Luka vidi Anine zahtjeve `FULL` u `GET /api/requests` i na kalendaru, a odobriti ih i dalje ne smije (T5, D2).
 - `GET /api/teams`: Eva: Mobile, Platform; Ivan: Platform; Sara: Mobile.
+- `decidedByName`, `cancelledByName` (L32): Ana odobri Ivanov zahtjev, Eva ga otkaže: `GET /api/me/requests` za Ivana daje `decidedByName` `Ana` i `cancelledByName` `Eva`; zahtjev na čekanju ima oba `null`; Ivan otkaže svoj: `cancelledByName` `Ivan`.
+
+## T8 Frontend
+
+Sloj: 1 Frontend (arhitektura: 1.1 UI, 1.2 Stanje, 1.3 API klijent). Next.js (App Router) i TypeScript u `frontend/`. Frontend ništa ne odlučuje: ne provjerava datume, salde ni ovlasti, nego šalje upit i prikaže odgovor ili `detail` greške (specifikacija 12). Sav tekst u UI-ju je na engleskom (Q54: sve na engleskom).
+
+### Rute
+
+| Ruta | Tko vidi | Ekran |
+| --- | --- | --- |
+| `/login` | svi, bez prijave | Login (D10: forma s korisničkim imenom i lozinkom) |
+| `/` | svi | samo preusmjerava: s tokenom na `/my-time-off`, bez tokena na `/login` |
+| `/my-time-off` | prijavljeni | My time off |
+| `/approvals` | prijavljeni; poveznica u navigaciji samo za voditelje i admine (`teamLead` ili `admin` iz `<Me>`) | Approvals |
+| `/calendar` | prijavljeni | Team calendar |
+
+- Prijavljen znači: token postoji u `localStorage` (Stanje, ispod). Ruta za prijavljene bez tokena odmah preusmjeri na `/login`, bez poziva API-ja.
+- Tko nije voditelj ni admin, a ručno otvori `/approvals`, vidi ekran s onim što vrati `GET /api/approvals`: praznu listu (T5). Frontend ne skriva ništa što API ne skriva (specifikacija 7).
+- API se zove relativnim putem (`/api/...`); Next.js ga prosljeđuje backendu (`rewrites`, adresa backenda iz varijable `API_URL`, default `http://localhost:8080`). Zato backend ne treba CORS.
+
+### Komponente
+
+Svaki ekran je komponenta koja se može renderirati sama, bez stranice oko nje. Stranice u `src/app/` samo slažu `AppShell` i ekran. Uvoz preko aliasa `@/` (= `frontend/src/`).
+
+| Komponenta | Datoteka | Radi |
+| --- | --- | --- |
+| `LoginScreen` | `src/components/LoginScreen.tsx` | forma za prijavu |
+| `HomeRedirect` | `src/components/HomeRedirect.tsx` | ruta `/`: s tokenom `router.replace("/my-time-off")`, bez tokena `router.replace("/login")`; ne zove API, ne prikazuje ništa (L37) |
+| `AppShell` | `src/components/AppShell.tsx` | omotač za rute prijavljenih: provjeri token, učita `<Me>` (`getMe`), prikaže navigaciju i `children` |
+| `MyTimeOffScreen` | `src/components/MyTimeOffScreen.tsx` | My time off |
+| `ApprovalsScreen` | `src/components/ApprovalsScreen.tsx` | Approvals |
+| `CalendarScreen` | `src/components/CalendarScreen.tsx` | Team calendar |
+
+Sve su imenovani izvozi (named export), bez propsa osim `children` kod `AppShell`. Navigacija koristi `useRouter()` iz `next/navigation` (`replace`), a poveznice `Link` iz `next/link`.
+
+Prikaz vrijednosti, isti na svim ekranima:
+
+| API | UI |
+| --- | --- |
+| `type` `VACATION`, `SICK_LEAVE`, `DAY_OFF` | `Vacation`, `Sick leave`, `Day off` |
+| `status` `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` | `Pending`, `Approved`, `Rejected`, `Cancelled` |
+| datumi | kako ih API vrati, `yyyy-MM-dd` |
+
+Greška: kad API vrati grešku, ekran prikaže njezin `detail` u elementu s `role="alert"`. Ostaje dok sljedeća akcija ne uspije. Na 401 ekran ne prikazuje grešku nego preusmjeri na `/login` (Stanje, ispod).
+
+### Login (`LoginScreen`)
+
+| Element | Oznaka za pronalaženje |
+| --- | --- |
+| naslov | `heading` `Sign in` |
+| korisničko ime | `textbox` s labelom `Username` |
+| lozinka | polje s labelom `Password` (`type="password"`) |
+| gumb | `button` `Sign in` |
+| greška | `alert`, npr. `Invalid username or password` |
+
+- Klik na `Sign in` zove `login(username, password)` s upisanim vrijednostima, bez provjere u frontendu (prazno polje: backend vraća 400 i `detail` se prikaže).
+- Uspjeh: token se spremi, `router.replace("/my-time-off")`.
+- Greška (i 401 kod logina): `alert` s `detail`; nema preusmjeravanja.
+
+### AppShell i navigacija
+
+- Bez tokena: `router.replace("/login")`, ne zove API, ne prikazuje `children`.
+- S tokenom: zove `getMe()`, pa prikaže `navigation` s imenom `Main` i `children`.
+
+| Element | Oznaka |
+| --- | --- |
+| poveznica | `link` `My time off`, `href` `/my-time-off` |
+| poveznica | `link` `Approvals`, `href` `/approvals`; samo ako je `teamLead` ili `admin` `true` |
+| poveznica | `link` `Team calendar`, `href` `/calendar` |
+| tko je prijavljen | tekst `Signed in as <name>`, npr. `Signed in as Ana` |
+| odjava | `button` `Log out` |
+
+### My time off (`MyTimeOffScreen`)
+
+Pri otvaranju zove `getMyBalance()` i `getMyRequests()`. Naslov: `heading` razine 1 `My time off`.
+
+**Saldo** (R12): `region` s imenom `Vacation balance <year>`, npr. `Vacation balance 2026` (to je i njegov naslov razine 2). Unutra parovi `term` / `definition`:
+
+| `term` | `definition` |
+| --- | --- |
+| `Entitlement` | `entitlement` |
+| `Used` | `used` |
+| `Pending` | `pending` |
+| `Remaining` | `remaining` |
+
+**Novi zahtjev:** `form` s imenom `New request`.
+
+| Polje | Oznaka | Vrijednosti |
+| --- | --- | --- |
+| tip | `combobox` s labelom `Type` | opcije `Vacation`, `Sick leave`, `Day off`; zadano `Vacation` |
+| početak | polje s labelom `Start date` (`type="date"`) | `yyyy-MM-dd`, zadano prazno |
+| kraj | polje s labelom `End date` (`type="date"`) | isto |
+| razlog | `textbox` s labelom `Reason` | nije obavezan |
+| gumb | `button` `Submit request` | |
+
+- Klik zove `createRequest({ type, startDate, endDate, reason })` s točno upisanim vrijednostima (prazan razlog kao `""`).
+- Uspjeh: forma se isprazni (tip natrag na `Vacation`), pa se ponovo zovu `getMyRequests()` i `getMyBalance()`.
+- Greška (npr. `Request overlaps an existing pending or approved request`, `Not enough vacation days: requested 13, remaining 12`): `alert` s `detail`; upisane vrijednosti ostaju.
+
+**Moji zahtjevi:** `table` s imenom `My requests`, redoslijed kako vrati API (najnoviji prvi).
+
+| Stupac (`columnheader`) | Sadržaj |
+| --- | --- |
+| `Type` | tip |
+| `Start date` | `startDate` |
+| `End date` | `endDate` |
+| `Reason` | `reason`, prazno ako `null` |
+| `Status` | stanje, uz ime iz `decidedByName` ili `cancelledByName` (L32), vidi ispod |
+| `Comment` | `decisionComment`, inače `cancelReason`, inače prazno |
+| `Actions` | gumb `Cancel` samo za `Pending` i `Approved` |
+
+- Tekst ćelije `Status` (L32; specifikacija 7: zaposlenik vidi tko je odlučio i tko je otkazao):
+
+  | `status` | Tekst | Primjer |
+  | --- | --- | --- |
+  | `PENDING` | `Pending` | `Pending` |
+  | `APPROVED` | `Approved by <decidedByName>` | `Approved by Ana` |
+  | `REJECTED` | `Rejected by <decidedByName>` | `Rejected by Ana` |
+  | `CANCELLED` | `Cancelled by <cancelledByName>` | `Cancelled by Eva`; i kad je otkazao sam vlasnik, npr. `Cancelled by Ivan` |
+
+  Ako je ime `null` (npr. izmjena izravno u bazi, D6), piše samo stanje, npr. `Approved`.
+- Bez zahtjeva: umjesto tablice tekst `No requests yet.`
+- Klik na `Cancel` u retku otvori u tom retku `textbox` s labelom `Cancel reason` i gumbe `Confirm cancel` i `Keep request`. `Keep request` zatvori bez poziva.
+- `Confirm cancel` zove `cancelRequest(id, reason)` (prazan razlog kao `""`). Uspjeh: ponovo `getMyRequests()` i `getMyBalance()`. Greška (npr. `Request has already started`, R7): `alert` s `detail`.
+- Je li odobreni zahtjev počeo, frontend ne provjerava; gumb `Cancel` je i tada prikazan, a backend vrati 409 (L27, točka 12).
+
+### Approvals (`ApprovalsScreen`)
+
+Pri otvaranju zove `getApprovals()`. Naslov: `heading` razine 1 `Approvals`. Saldo podnositelja se ne prikazuje (L28).
+
+`table` s imenom `Pending requests`, redoslijed kako vrati API:
+
+| Stupac | Sadržaj |
+| --- | --- |
+| `Employee` | `ownerName` |
+| `Type` | tip |
+| `Start date` | `startDate` |
+| `End date` | `endDate` |
+| `Reason` | `reason`, prazno ako `null` |
+| `Decision` | `textbox` s labelom `Comment`, gumbi `Approve` i `Reject` |
+
+- Svaki red ima svoje polje i gumbe; test ih traži unutar retka (`within(row)`).
+- `Approve` zove `approveRequest(id, comment)`, `Reject` zove `rejectRequest(id, comment)`, s upisanim komentarom (prazan kao `""`). Frontend ne provjerava je li komentar upisan (R5 provjerava backend: 400 `comment must not be blank`).
+- Uspjeh: ponovo `getApprovals()`, pa odlučeni zahtjev nestane s popisa. Greška: `alert` s `detail`.
+- Bez zahtjeva: umjesto tablice tekst `No requests waiting for approval.`
+
+### Team calendar (`CalendarScreen`)
+
+Pri otvaranju zove `getTeams()` i `getCalendar(<tekući mjesec>)`. Tekući mjesec je `yyyy-MM` iz `new Date()` u lokalnom vremenu preglednika. Naslov: `heading` razine 1 `Team calendar`.
+
+| Element | Oznaka | Radi |
+| --- | --- | --- |
+| prikazani mjesec | `heading` razine 2, tekst `yyyy-MM`, npr. `2026-11` | |
+| prethodni mjesec | `button` `Previous month` | `getCalendar` za mjesec prije, s istim timom |
+| sljedeći mjesec | `button` `Next month` | `getCalendar` za mjesec poslije, s istim timom |
+| tim | `combobox` s labelom `Team` | prva opcija `All teams` (bez `teamId`), pa timovi iz `getTeams()` redom kako ih vrati API; promjena zove `getCalendar(month, teamId)` |
+
+Popis po danima (specifikacija 12):
+
+- Za svaki dan od ponedjeljka do petka u prikazanom mjesecu na koji pada barem jedan unos postoji `region` s imenom datuma `yyyy-MM-dd` (i naslovom razine 3 s tim tekstom). Dani idu uzlazno. Subota i nedjelja se ne prikazuju (R10).
+- Unos pada na dan ako je dan između `startDate` i `endDate`, oba uključiva. Unos koji počinje prije ili završava poslije mjeseca prikazuje se samo na danima tog mjeseca.
+- U regiji je lista (`listitem` po unosu), redoslijed kako vrati API:
+  - unos s `type` i `status` (`FULL`): `<name> (<Type>, <Status>)`, npr. `Ivan (Vacation, Pending)`;
+  - unos bez njih (`LIMITED`): samo `<name>`, npr. `Marko`.
+- Bez ijednog unosa u mjesecu: tekst `No absences this month.`
+
+### Stanje (`src/lib/session.ts`)
+
+| Funkcija | Radi |
+| --- | --- |
+| `getToken()` | vraća token ili `null` |
+| `setToken(token)` | sprema token |
+| `clearToken()` | briše token |
+
+- Token je u `localStorage` pod ključem `timeoff.token`. Test se može "prijaviti" tako da sam upiše taj ključ.
+- `<Me>` se ne sprema; `AppShell` ga čita s `GET /api/me` kod svakog otvaranja rute, pa izmjena uloge u bazi (D6) vrijedi bez nove prijave, kao u backendu (T2).
+- Odjava: `Log out` pozove `clearToken()` i `router.replace("/login")`. Backend se ne zove (T2: odjava ne postoji na serveru).
+- 401 iz bilo kojeg poziva osim `login`: API klijent obriše token (`clearToken()`) i baci `ApiError` sa `status` 401; ekran tada napravi `router.replace("/login")` i ne prikazuje `alert`.
+
+### API klijent (`src/lib/api.ts`)
+
+Tipovi su u `src/lib/types.ts`, s istim imenima polja kao JSON iz T2–T7: `Me`, `Balance`, `TimeOffRequest` (= `<Request>` iz T7, s `decidedByName` i `cancelledByName`), `CalendarEntry` (`type` i `status` opcionalni), `Team`, `NewRequest` (`type`, `startDate`, `endDate`, `reason`), `TimeOffType`, `RequestStatus`.
+
+| Funkcija | Upit | Tijelo | Vraća |
+| --- | --- | --- | --- |
+| `login(username, password)` | `POST /api/auth/login` | `{ "username", "password" }` | `{ token, user: Me }`; token sprema sam (`setToken`) |
+| `getMe()` | `GET /api/me` | | `Me` |
+| `getMyBalance()` | `GET /api/me/balance` | | `Balance` |
+| `getMyRequests()` | `GET /api/me/requests` | | `TimeOffRequest[]` |
+| `createRequest(request: NewRequest)` | `POST /api/requests` | `{ "type", "startDate", "endDate", "reason" }` | `TimeOffRequest` |
+| `cancelRequest(id, reason)` | `POST /api/requests/{id}/cancel` | `{ "reason" }` | `TimeOffRequest` |
+| `getApprovals()` | `GET /api/approvals` | | `TimeOffRequest[]` |
+| `approveRequest(id, comment)` | `POST /api/requests/{id}/approve` | `{ "comment" }` | `TimeOffRequest` |
+| `rejectRequest(id, comment)` | `POST /api/requests/{id}/reject` | `{ "comment" }` | `TimeOffRequest` |
+| `getCalendar(month, teamId?)` | `GET /api/calendar?month=<yyyy-MM>`, uz `&teamId=<id>` samo kad je zadan | | `CalendarEntry[]` |
+| `getTeams()` | `GET /api/teams` | | `Team[]` |
+
+Kako zove `fetch` (za test s lažnim `fetch`, npr. `vi.stubGlobal("fetch", vi.fn())`):
+
+- Jedan poziv `fetch(url, init)` po funkciji. `url` je relativan put iz tablice, npr. `/api/me/balance`, `/api/requests/7/approve`, `/api/calendar?month=2026-11&teamId=1`.
+- `init.method` je `GET` ili `POST`. `init.headers` je običan objekt: `Authorization: Bearer <token>` kad token postoji (`login` ga nikad ne šalje); uz tijelo i `Content-Type: application/json`. `init.body` je `JSON.stringify` tijela iz tablice; vrijednosti se šalju kako su dane, bez obrade.
+- 2xx: vraća pročitani JSON.
+- Ne-2xx: baca `ApiError` (klasa izvezena iz `src/lib/api.ts`, nasljeđuje `Error`) s poljem `status` (HTTP status) i `message` = `detail` iz ProblemDetail tijela. Ako tijelo nije JSON ili nema `detail`: `message` je `Request failed with status <status>`.
+- 401 osim kod `login`: prije bacanja obriše token (Stanje).
+- `fetch` sam baci grešku (mreža): `ApiError` sa `status` 0 i `message` `Cannot reach the server`.
+- Lažni odgovor test može napraviti s `new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/problem+json" } })`.
+
+### Testovi
+
+| Što | Vrijednost |
+| --- | --- |
+| Alati | Vitest, React Testing Library, `@testing-library/user-event`, `@testing-library/jest-dom`, jsdom |
+| Gdje | `frontend/tests/`, datoteke `*.test.ts` i `*.test.tsx` |
+| Pokretanje | u `frontend/`: `npm test` (`vitest run`); bez testova prolazi |
+| Konfiguracija | `frontend/vitest.config.mts`; alias `@/` radi kao u aplikaciji |
+| Setup | `frontend/tests/setup.ts`: jest-dom matcheri (`toBeInTheDocument` i sl.); nakon svakog testa `cleanup()`, `localStorage.clear()`, `vi.restoreAllMocks()`, `vi.unstubAllGlobals()` |
+
+- `next/navigation` test mocka sam: `vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, push }) }))`, pa provjeri `replace("/login")` i sl.
+- Tekući mjesec: `vi.useFakeTimers({ toFake: ["Date"] })` i `vi.setSystemTime(...)`; lažira se samo `Date`, inače `findBy...` čeka zauvijek.
+- Testovi ne trebaju backend: sve ide kroz lažni `fetch`.
+
+### Što testovi mogu provjeriti
+
+Seed (T1): Ana vodi Platform, Eva je admin, Ivan je zaposlenik. Odgovore backenda daje lažni `fetch`.
+
+- API klijent: za svaku funkciju put, metoda, zaglavlja i tijelo; `login` bez `Authorization`; ostale s tokenom iz `localStorage`; `getCalendar` bez i s `teamId`; ProblemDetail 409 daje `ApiError` sa `status` 409 i `detail` kao `message`; tijelo bez `detail`; mrežna greška: `status` 0; 401 briše token, 401 kod `login` ne.
+- Login: uspjeh sprema token pod `timeoff.token` i ide na `/my-time-off`; 401 prikaže `Invalid username or password` u `alert`.
+- AppShell: bez tokena `replace("/login")` i nema poziva `fetch`; Ivan ne vidi poveznicu `Approvals`, Ana i Eva je vide; `Signed in as Ana`; `Log out` briše token i ide na `/login`; 401 s `/api/me` ide na `/login`.
+- My time off: saldo iz `getMyBalance`; redovi tablice s prikazom tipa i stanja; `Approved by Ana`, `Rejected by Ana`, `Cancelled by Eva`, `Pending` bez imena (L32); `Cancel` samo za `Pending` i `Approved`; slanje forme šalje upisane vrijednosti i ponovo učita popis i saldo; 409 iz `createRequest` prikaže `detail`, vrijednosti ostaju; otkazivanje s razlogom; 409 `Request has already started` se prikaže.
+- Approvals: red s `ownerName`; `Approve` i `Reject` šalju komentar iz svog retka; 400 `comment must not be blank` se prikaže; nakon uspjeha red nestane; prazan popis daje `No requests waiting for approval.`
+- Team calendar: tekući mjesec iz sata; `Next month` i `Previous month` zovu `getCalendar` s pravim `month`; izbor tima šalje `teamId`, `All teams` ga ne šalje; unos od petka do utorka pokazuje se pod petkom, ponedjeljkom i utorkom, ne pod vikendom; unos koji počinje u prethodnom mjesecu pokazuje se od prvog dana mjeseca; `FULL` unos s tipom i stanjem, `LIMITED` samo ime; prazan mjesec daje `No absences this month.`

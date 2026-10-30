@@ -7,7 +7,7 @@ import com.example.timeoff.domain.User;
 import java.time.Instant;
 import java.time.LocalDate;
 
-// The <Request> body from interfaces T4, T5 and T6.
+// The <Request> body from interfaces T4 to T7 (names of decider and canceller: L32).
 record RequestView(
         Long id,
         Long ownerId,
@@ -20,9 +20,11 @@ record RequestView(
         Instant createdAt,
         String decisionComment,
         Long decidedById,
+        String decidedByName,
         Instant decidedAt,
         String cancelReason,
         Long cancelledById,
+        String cancelledByName,
         Instant cancelledAt
 ) {
 
@@ -30,6 +32,8 @@ record RequestView(
         User owner = request.getOwner();
         Long decidedById = idOrNull(request.getDecidedBy());
         Long cancelledById = idOrNull(request.getCancelledBy());
+        String decidedByName = nameOrNull(request.getDecidedBy());
+        String cancelledByName = nameOrNull(request.getCancelledBy());
 
         return new RequestView(
                 request.getId(),
@@ -43,9 +47,11 @@ record RequestView(
                 request.getCreatedAt(),
                 request.getDecisionComment(),
                 decidedById,
+                decidedByName,
                 request.getDecidedAt(),
                 request.getCancelReason(),
                 cancelledById,
+                cancelledByName,
                 request.getCancelledAt()
         );
     }
@@ -56,5 +62,13 @@ record RequestView(
         }
 
         return user.getId();
+    }
+
+    private static String nameOrNull(User user) {
+        if (user == null) {
+            return null;
+        }
+
+        return user.getName();
     }
 }

@@ -458,6 +458,78 @@ class VisibilityApiTest {
         assertThat(ownerNames(items(anaList))).containsExactly("Sara");
     }
 
+    // L32, Q46, Q30, Q31: zahtjev nosi ime onoga tko je odlučio i tko je otkazao
+
+    @Test
+    void ownRequestShowsNamesOfApproverAndCanceller_Q46() throws Exception {
+        long id = request("ivan", "PENDING");
+        String anaToken = api.tokenOf("ana");
+        String evaToken = api.tokenOf("eva");
+        String approveJson = "{\"comment\":\"ok\"}";
+        String cancelJson = "{\"reason\":\"Reorg\"}";
+
+        HttpResponse<String> approve = api.post("/api/requests/" + id + "/approve", anaToken, approveJson);
+        HttpResponse<String> cancel = api.post("/api/requests/" + id + "/cancel", evaToken, cancelJson);
+        HttpResponse<String> mine = get("ivan", "/api/me/requests");
+        String approveBody = approve.body();
+        String cancelBody = cancel.body();
+        Map<String, Object> item = byId(items(mine), id);
+
+        assertThat(approve.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<String>read(approveBody, "$.decidedByName")).isEqualTo("Ana");
+        assertThat(cancel.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<String>read(cancelBody, "$.decidedByName")).isEqualTo("Ana");
+        assertThat(JsonPath.<String>read(cancelBody, "$.cancelledByName")).isEqualTo("Eva");
+        assertThat(item).containsEntry("ownerName", "Ivan");
+        assertThat(item).containsEntry("decidedByName", "Ana");
+        assertThat(item).containsEntry("cancelledByName", "Eva");
+    }
+
+    @Test
+    void pendingRequestHasNoDeciderOrCancellerName_L32() throws Exception {
+        long id = request("ivan", "PENDING");
+
+        HttpResponse<String> mine = get("ivan", "/api/me/requests");
+        Map<String, Object> item = byId(items(mine), id);
+
+        assertThat(item).containsEntry("decidedByName", null);
+        assertThat(item).containsEntry("cancelledByName", null);
+    }
+
+    @Test
+    void ownerCancellingOwnRequestShowsOwnName_R6() throws Exception {
+        long id = request("ivan", "PENDING");
+        String ivanToken = api.tokenOf("ivan");
+
+        HttpResponse<String> cancel = api.post("/api/requests/" + id + "/cancel", ivanToken, "");
+        HttpResponse<String> mine = api.get("/api/me/requests", ivanToken);
+        Map<String, Object> item = byId(items(mine), id);
+
+        assertThat(cancel.statusCode()).isEqualTo(200);
+        assertThat(item).containsEntry("cancelledByName", "Ivan");
+        assertThat(item).containsEntry("decidedByName", null);
+    }
+
+    @Test
+    void rejectionShowsDeciderNameInLeadsRequestList_Q46() throws Exception {
+        long id = request("ivan", "PENDING");
+        String anaToken = api.tokenOf("ana");
+        String rejectJson = "{\"comment\":\"Busy week\"}";
+
+        HttpResponse<String> reject = api.post("/api/requests/" + id + "/reject", anaToken, rejectJson);
+        HttpResponse<String> list = api.get("/api/requests", anaToken);
+        HttpResponse<String> detail = api.get("/api/requests/" + id, anaToken);
+        String rejectBody = reject.body();
+        String detailBody = detail.body();
+        Map<String, Object> item = byId(items(list), id);
+
+        assertThat(reject.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<String>read(rejectBody, "$.decidedByName")).isEqualTo("Ana");
+        assertThat(item).containsEntry("decidedByName", "Ana");
+        assertThat(JsonPath.<String>read(detailBody, "$.decidedByName")).isEqualTo("Ana");
+        assertThat(JsonPath.<String>read(detailBody, "$.cancelledByName")).isNull();
+    }
+
     // Bez prijave
 
     @ParameterizedTest(name = "{0}")
