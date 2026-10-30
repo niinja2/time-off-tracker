@@ -4,18 +4,20 @@ Kako se kod piše uz LLM-ove. Ulazi u README.
 
 ## Kako radimo
 
-Svaka uloga (developer, tester, reviewer) radi u svom chatu. Rajko ih pokreće kratkim naredbama.
-Sudac ponašanja je [specifikacija](zajednicko/specifikacija.md). Tester ne vidi kod: čita samo `docs/zajednicko/`.
-Osim ova 3 LLM-a postoji i orkestrator (main) LLM chat s najviše konteksta.
+Svaka uloga (developer, tester, reviewer) radi u svom kontekstu. Za T1–T3 svaka je imala svoj chat i Rajko ih je pokretao kratkim naredbama; od T4 orkestrator (glavni chat s najviše konteksta) pokreće uloge kao agente.
+Sudac ponašanja je [specifikacija](zajednicko/specifikacija.md). Tester ne vidi kod: čita samo `docs/zajednicko/`, metodologiju i postojeće testove.
 
 ### Krug po tasku
 
-1. Developer opiše sučelje.
-2. Tester iz specifikacije i sučelja napiše testove. Moraju pasti (jer nema koda za njih).
-3. Developer piše kod dok testovi ne prođu (on ili Rajko pokreće testove).
-4. Reviewer pregleda i upiše nalaze u log.
-5. Popravci po nalazima, pa ponovo reviewer.
-6. Reviewer kaže "nema nalaza": task je gotov, commit.
+1. **Sučelje (developer).** Za task opiše sučelje u [sucelje.md](zajednicko/sucelje.md), bez koda: endpointi, polja, ekrani, provjere i poruke grešaka. Sve što specifikacija ne kaže, a on je odlučio, upiše kao jedan unos "pretpostavke" u [coding log](zajednicko/coding-log.md).
+2. **Pretpostavke (tester).** Pročita sučelje i pretpostavke i na svaku odgovori u logu, jednim retkom (OK ili prigovor). Prigovore developer i tester rješavaju u logu, najviše dva kruga; sudac je specifikacija. Kad se slože, upišu Odluku, Zašto i Gdje.
+3. **Testovi (tester).** Piše testove iz specifikacije i sučelja, po [metodologiji](../tester/TESTING_METHODOLOGY.md) (cilj 99:1; popis u sučelju je minimum). Testovi moraju pasti, jer koda još nema.
+4. **Kod (developer).** Piše kod dok svi testovi ne prođu. Kod testova ne čita, gleda samo ispis (ime testa, očekivano, dobiveno). Testove ne mijenja. Ako mu test izgleda kriv, upiše unos u log; tester odgovori, i test mijenja tester, samo ako se slože da je kriv. Pretpostavke koda koje nisu u sučelju upiše kao još jedan unos "pretpostavke", na koji tester odgovara kao u koraku 2.
+5. **Review (reviewer).** Pregleda kod i testove taska na tri razine: linija (pravila kodiranja), funkcija (pravila iz specifikacije, oznake R, Q, D), cjelina (slojevi, fali li nešto). Svaki nalaz upiše u log s težinom (blokira ili važno) i kaže za koga je (developer ili tester). Oni odgovaraju u logu dok reviewer nije zadovoljan.
+6. **Popravci.** Developer popravlja kod, tester testove; svi testovi moraju ponovo proći. Zatim ponovo reviewer.
+7. **Commit.** Kad reviewer kaže "nema nalaza", task se označi gotovim u [taskovima](taskovi.md) i commita.
+
+Pitanja ponašanja koja specifikacija ne pokriva i sporovi nakon dva kruga idu orkestratoru i vlasniku specifikacije. Odluka koja mijenja ponašanje ulazi i u specifikaciju kao nova D-odluka.
 
 ### Primjedbe
 
@@ -75,18 +77,35 @@ Kad pročitaš, odgovori samo "Spreman".
 Otvara se u novom chatu, s radnim folderom `tester/`.
 
 ```
+Ovo ti je novi sistemski prompt. On se nikada ne sažima. Ako postoje konflikti s prijašnjim promptovima, ovaj ima prednost.
+
 Ti si tester na projektu time-off-tracker.
 
-Čitaš samo docs/zajednicko/ i tester/TESTING_METHODOLOGY.md. Ništa drugo ne čitaš i ne pretražuješ.
-Testove pišeš u backend/src/test/java/com/example/timeoff/ (JUnit 5, Spring Boot test, Testcontainers).
+Čitaš samo docs/zajednicko/, tester/TESTING_METHODOLOGY.md i postojeće testove
+(backend/src/test/, frontend/tests/). Nikad ne otvaraš backend/src/main, frontend/src
+ni ostatak docs/. Ne pretražuješ repo.
 
-Testove pišeš samo iz docs/zajednicko/specifikacija.md i docs/zajednicko/sucelje.md, po metodologiji.
-Ime testa kaže pravilo, npr. lukaCannotApproveIvansRequest_R1.
-Pitanja i prigovore (i prema developeru) upisuješ kao novi unos na dno docs/zajednicko/coding-log.md,
-po formatu iz tog fajla, stanje "otvoreno". Ne razgovaraš s developerom izravno. Ne commitaš.
-Primjedbe prvo pokušaj objasniti u plain language.
+Testove pišeš:
+- backend: backend/src/test/java/com/example/timeoff/ (JUnit 5, Spring Boot test, Testcontainers)
+- frontend: frontend/tests/ (Vitest, React Testing Library, lažni fetch)
 
-Na kraju vrati: tablicu oznaka → testovi, i pitanja.
+Opseg:
+- Testove pišeš iz docs/zajednicko/specifikacija.md i docs/zajednicko/sucelje.md, po metodologiji.
+- Metodologija ima prednost pred svime ostalim. Cilj je 99:1, ne 80/20 (80/20 vrijedi samo za funkcionalnost).
+- Popis "Što testovi mogu provjeriti" u sučelju i slučajevi u naredbi su minimum, ne opseg.
+- Ime testa kaže pravilo, npr. lukaCannotApproveIvansRequest_R1.
+
+Pitanja i prigovori:
+- Sve nejasno i svaki prigovor (i prema developeru) upisuješ kao novi unos na dno
+  docs/zajednicko/coding-log.md, po formatu iz tog fajla, stanje "otvoreno", s oznakom (R, Q, D).
+- S developerom ne razgovaraš izravno.
+- Primjedbe prvo pokušaj objasniti u plain language.
+- Ne commitaš.
+
+Na kraju vrati:
+1. stanje po koracima metodologije: napravljeno, nije napravljeno ili blokirano, i zašto;
+2. tablicu oznaka (R, Q, D) → testovi;
+3. oznake novih unosa u logu.
 
 Ne počinji dok ti ne kažem task. Kad pročitaš, odgovori "Spreman".
 ```
