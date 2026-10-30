@@ -446,3 +446,122 @@ Seed (T1): Ana vodi Platform (Ivan, Marko, Petra), Luka vodi Mobile (Sara, Tom),
 - Nepostojeći `id`: 404. Bez tokena: 401.
 - Redoslijed: Luka otkazuje Ivanov zahtjev bez razloga: 403 (ovlasti prije razloga); Ana otkazuje Ivanov odbijeni zahtjev bez razloga: 400 (razlog prije stanja).
 - Postojeće zahtjeve test sprema sam (repozitorij ili SQL), kao u T3.
+
+## T7 Vidljivost i kalendar
+
+Slojevi: 3 API, 4 Servisi (arhitektura). Paketi: `com.example.timeoff.service` za servise, pravilo vidljivosti i zapise, `com.example.timeoff.api` za controllere.
+
+### Endpointi
+
+| Metoda i put | Prijava | Parametri | Odgovor | Ekran (specifikacija 12) |
+| --- | --- | --- | --- | --- |
+| `GET /api/me/requests` | `Authorization: Bearer <JWT>` | nema | 200 `[<Request>, ...]` | My time off |
+| `GET /api/requests` | `Authorization: Bearer <JWT>` | nema | 200 `[<Request>, ...]` | nema; API za pravila vidljivosti (specifikacija 7; brief: API se zove izravno kao razni korisnici) |
+| `GET /api/requests/{id}` | `Authorization: Bearer <JWT>` | nema | 200 `<Request>` | nema; isto |
+| `GET /api/users/{id}/balance` | `Authorization: Bearer <JWT>` | nema | 200 `<Balance>` iz T3 | nema; saldo drugih (Q16, Q17), najavljen u T3 |
+| `GET /api/calendar` | `Authorization: Bearer <JWT>` | `month` obavezan, `yyyy-MM`; `teamId` nije obavezan | 200 `[<CalendarEntry>, ...]` | Team calendar |
+| `GET /api/teams` | `Authorization: Bearer <JWT>` | nema | 200 `[<Team>, ...]` | Team calendar, filter po timu (Q43, D12) |
+
+- `GET /api/me/requests`: svi zahtjevi prijavljenog korisnika, u svim stanjima, puni `<Request>` iz T6 (Q44–Q46: zaposlenik vidi svoje zahtjeve sa svim detaljima). Poredani po `startDate` silazno, pa po `id` silazno (najnoviji prvi).
+- `GET /api/requests`: svi zahtjevi, u svim stanjima, čiji je vlasnik za prijavljenog korisnika `FULL` (Vidljivost, ispod). Puni `<Request>`, poredani kao `GET /api/me/requests`. Zaposlenik dobiva samo svoje.
+- `GET /api/requests/{id}`: jedan zahtjev, ako je vlasnik za prijavljenog korisnika `FULL`.
+- `GET /api/users/{id}/balance`: saldo korisnika `id` za tekuću godinu (T3, Današnji datum), ako je taj korisnik za prijavljenog `FULL`. Oblik kao `GET /api/me/balance`.
+- `GET /api/calendar`: zahtjevi `PENDING` i `APPROVED` čiji raspon ima barem jedan dan u mjesecu `month` (oba kraja uključiva), po pravilima kalendara (Vidljivost). Svaki zahtjev je jedan unos s cijelim rasponom datuma, i kad počinje prije ili završava poslije mjeseca. Poredani po `startDate`, pa po `name`. Grupiranje po danima radi frontend.
+- `teamId`: ostaju samo unosi čiji je vlasnik član tog tima; vidljivost se ne mijenja. Tim u kojem prijavljeni ne vidi nikoga, ili tim koji ne postoji, daje praznu listu.
+- `GET /api/teams`: admin dobiva sve timove; ostali timove u kojima su član (voditelj je član timova koje vodi, Q3). Poredani po `name`.
+
+`<CalendarEntry>`, dva oblika:
+
+| Pristup | Polja | Primjer |
+| --- | --- | --- |
+| `FULL` | `name`, `startDate`, `endDate`, `type`, `status` | `{ "name": "Ivan", "startDate": "2026-11-02", "endDate": "2026-11-06", "type": "VACATION", "status": "PENDING" }` |
+| `LIMITED` | samo `name`, `startDate`, `endDate`; ključevi `type` i `status` ne postoje u JSON-u | `{ "name": "Marko", "startDate": "2026-11-09", "endDate": "2026-11-10" }` |
+
+- Unos nema `reason`, `id` zahtjeva ni id korisnika (brief: kolege vide samo ime i datume; Q42 za voditelja kaže samo "s tipom"). Detalje zahtjeva s pristupom `FULL` korisnik čita preko `GET /api/requests`.
+
+`<Team>`: `{ "id": 1, "name": "Platform" }`.
+
+### Vidljivost
+
+Koliko prijavljeni korisnik (`viewer`) vidi o zahtjevima vlasnika (`owner`). Pravila se gledaju redom, prvo koje odgovara odlučuje:
+
+| # | Uvjet | Pristup | Izvor |
+| --- | --- | --- | --- |
+| 1 | `viewer` je `owner` | `FULL` | brief, Q41, Q44–Q46 |
+| 2 | `viewer` je admin | `FULL` | brief, Q17, Q43 |
+| 3 | `viewer` vodi tim u kojem je `owner` član | `FULL` | brief, Q16, Q42 |
+| 4 | `viewer` i `owner` su članovi istog tima | `LIMITED` | brief, Q47 |
+| 5 | inače, npr. `owner` bez tima | `NONE` | specifikacija 7 |
+
+Što pristup znači:
+
+| Pristup | Zahtjevi s detaljima (`GET /api/requests`, `/api/requests/{id}`) | Saldo (`GET /api/users/{id}/balance`) | Kalendar |
+| --- | --- | --- | --- |
+| `FULL` | svi, u svim stanjima | da | `PENDING` i `APPROVED`, oblik `FULL` |
+| `LIMITED` | ne | ne | samo `APPROVED`, oblik `LIMITED` |
+| `NONE` | ne | ne | ništa |
+
+- `REJECTED` i `CANCELLED` nikad nisu na kalendaru (Q48: odbijeni i otkazani se ne prikazuju nikome).
+- Red 3 vrijedi i kad je `owner` voditelj koji je član tuđeg tima: voditelj tog tima vidi njegove zahtjeve, iako ih ne smije odobriti. D2 (zahtjev voditelja ide adminu) je pravilo odobravanja, ne vidljivosti; specifikacija 7 kaže "sve zahtjeve članova timova koje vodi".
+- Kad `viewer` i `owner` dijele više timova, vrijedi prvi red koji odgovara, dakle najviši pristup.
+
+`VisibilityPolicy` (Spring komponenta): `access(User viewer, User owner)` vraća `Access` (enum u `com.example.timeoff.service`: `FULL`, `LIMITED`, `NONE`) po ovoj tablici. Jedino mjesto za pravilo vidljivosti; koriste ga svi endpointi T7.
+
+### Provjere
+
+Redom; prva koja padne određuje odgovor. Greške su `application/problem+json`.
+
+| # | Provjera | Endpoint | Status | `detail` |
+| --- | --- | --- | --- | --- |
+| 1 | `id` ili `teamId` nije broj; `month` nedostaje ili nije `yyyy-MM` | svi s parametrom | 400 | koje polje nije ispravno |
+| 2 | Zahtjev s tim `id` ne postoji | `GET /api/requests/{id}` | 404 | `Request not found` |
+| 2 | Korisnik s tim `id` ne postoji | `GET /api/users/{id}/balance` | 404 | `User not found` |
+| 3 | Pristup nije `FULL` | `GET /api/requests/{id}` | 403 | `You cannot view this request` |
+| 3 | Pristup nije `FULL` | `GET /api/users/{id}/balance` | 403 | `You cannot view this balance` |
+
+- Provjera 1 je API (oblik ulaza); 2 i 3 servis. Postojanje se gleda prije ovlasti, kao u T5 i T6.
+- Popisi (`/api/me/requests`, `/api/requests`, `/api/calendar`, `/api/teams`) nikad ne daju 403: tko ne vidi ništa, dobiva praznu listu, kao `GET /api/approvals` u T5.
+- Bez tokena: 401, kao u T2.
+
+### Servis
+
+`VisibilityService` (Spring servis), svaka metoda u svojoj transakciji, samo čitanje:
+
+| Metoda | Vraća | Radi |
+| --- | --- | --- |
+| `mine(Long userId)` | `List<TimeOffRequest>` | zahtjevi korisnika, poredani kao gore |
+| `visible(Long viewerId)` | `List<TimeOffRequest>` | zahtjevi čiji je vlasnik `FULL` |
+| `get(Long requestId, Long viewerId)` | `TimeOffRequest` | provjere 2–3 |
+| `balance(Long userId, Long viewerId)` | `Balance` | provjere 2–3, pa `BalanceService.balance(userId, tekuća godina)` |
+
+`CalendarService` (Spring servis), svaka metoda u svojoj transakciji, samo čitanje:
+
+| Metoda | Vraća | Radi |
+| --- | --- | --- |
+| `month(Long viewerId, YearMonth month, Long teamId)` | `List<CalendarEntry>` | unosi po tablici Vidljivost; `teamId` smije biti `null` (bez filtra) |
+| `teams(Long viewerId)` | `List<Team>` | timovi kao `GET /api/teams` |
+
+`CalendarEntry` (record u `com.example.timeoff.service`): `name` (`String`), `startDate`, `endDate` (`LocalDate`), `type` (`TimeOffType`), `status` (`Status`), tim redom. Za `LIMITED` su `type` i `status` `null`, a API ih ne piše u JSON.
+
+- Filtriranje je u Javi, iz `findAll`, kao `GET /api/approvals` (L24, točka 2). Novi upiti u repozitorijima ne trebaju.
+- Iznimke su postojeće: `NotFoundException` (404), `ForbiddenException` (403).
+
+### Što testovi mogu provjeriti
+
+Seed (T1): Ana vodi Platform (Ivan, Marko, Petra), Luka vodi Mobile (Sara, Tom), Eva je admin bez tima. Postojeće zahtjeve test sprema sam (repozitorij ili SQL), kao u T3.
+
+- `GET /api/me/requests`: Ivan dobiva samo svoje, u svim stanjima, s `decisionComment`, `decidedById`, `cancelReason`, `cancelledById`; najnoviji `startDate` prvi; bez zahtjeva prazna lista.
+- `GET /api/requests`: Ivan vidi samo svoje; Ana svoje te Ivanove, Markove i Petrine u svim stanjima, s `type` i `reason`, ne Sarine; Luka svoje, Sarine i Tomove, ne Anine; Eva sve.
+- `GET /api/requests/{id}`: Ana na Ivanov odbijeni: 200; Ivan na Markov: 403; Luka na Ivanov: 403; Eva na bilo koji: 200; nepostojeći: 404; `id` nije broj: 400.
+- `GET /api/users/{id}/balance`: Ivan za sebe: 200; Ana za Ivana: 200; Ana za Saru: 403; Ivan za Marka: 403; Luka za Anu: 403; Eva za Toma: 200, `entitlement` 12 (fiksni sat u 2026.); nepostojeći korisnik: 404.
+- `GET /api/calendar?month=2026-11`:
+  - Ivan: svoje `PENDING` i `APPROVED` s `type` i `status`; Markov `APPROVED` bez ključeva `type` i `status`; Markov `PENDING` ne; Anin `APPROVED` (Ana je članica Platforma) bez `type`; Sarin i Evin ne; `REJECTED` i `CANCELLED` ničiji.
+  - Ana: Ivanov `PENDING` i `APPROVED` s `type`; Lukin ne.
+  - Luka: Sarin i Tomov `PENDING` i `APPROVED` s `type`.
+  - Eva: svi u tvrtki, i njezin (korisnica bez tima); s `teamId` Platforma samo Ana, Ivan, Marko, Petra.
+  - Ivan s `teamId` Mobilea: prazna lista.
+- Raspon: zahtjev 2026-10-29 do 2026-11-03 je i u `month=2026-10` i u `month=2026-11`, s cijelim rasponom; zahtjev u prosincu nije u studenom.
+- `month` nedostaje ili je `2026-13`: 400. Bez tokena: 401.
+- Više timova (test SQL-om doda Saru u Platform): Ivan vidi Sarin odobreni zahtjev jednom, `LIMITED`; Ana ga vidi `FULL`.
+- Voditelj u tuđem timu (test SQL-om doda Anu u Mobile): Luka vidi Anine zahtjeve `FULL` u `GET /api/requests` i na kalendaru, a odobriti ih i dalje ne smije (T5, D2).
+- `GET /api/teams`: Eva: Mobile, Platform; Ivan: Platform; Sara: Mobile.

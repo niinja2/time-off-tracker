@@ -348,3 +348,74 @@ Format:
 **Odluka:** Sve četiri pretpostavke vrijede.
 **Zašto:** Developer i tester se slažu; nema konflikta.
 **Gdje:** kod T6 (bez izmjena sučelja ni testova)
+
+## L27 · riješeno · T7 · pretpostavke
+
+**Problem** (developer): Sučelje T7 radi po pretpostavkama koje specifikacija ne kaže. Neka se potvrde ili isprave:
+
+1. Za ekran My time off dodaje se popis vlastitih zahtjeva (`GET /api/me/requests`), u svim stanjima, najnoviji prvi. Ostalo za taj ekran (kreiranje, otkazivanje, saldo) već postoji iz T3, T4 i T6.
+2. Iako ga nijedan ekran ne treba, dodaje se popis i dohvat jednog zahtjeva sa svim detaljima za voditelja i admina (`GET /api/requests`, `GET /api/requests/{id}`) i saldo drugih (`GET /api/users/{id}/balance`). Brief kaže da će API zvati izravno kao razni korisnici, a specifikacija 7 nabraja što voditelj i admin vide (Q16: voditelj vidi saldo članova; Q17: admin vidi sve salde).
+3. Jedno pravilo vidljivosti s tri razine (sve, samo ime i datumi, ništa) vrijedi za sve: zahtjeve, saldo i kalendar. Tko vidi sve o nekome, vidi i njegov saldo i pune unose na kalendaru.
+4. Voditelj vidi sve zahtjeve člana svog tima i kad je taj član voditelj nekog drugog tima, iako ih ne smije odobriti (D2: zahtjev voditelja ide adminu je pravilo odobravanja, ne vidljivosti).
+5. Kad dvoje dijele više timova, vrijedi viša razina, a osoba je na kalendaru samo jednom.
+6. Unos na kalendaru nikad nema razlog, ni za voditelja ni za admina; Q42 kaže samo "s tipom". Razlog se čita iz popisa zahtjeva. Unos ima i stanje (na čekanju ili odobren), da se razlikuju.
+7. Kolegama se na kalendaru ne šalju tip i stanje ni kao prazna vrijednost: ta polja u odgovoru ne postoje.
+8. Zahtjev koji samo dijelom pada u mjesec prikazuje se s cijelim rasponom datuma. Grupiranje po danima radi frontend.
+9. Filtar po timu samo sužava popis; vidljivost se ne mijenja. Tim u kojem korisnik nikoga ne vidi, ili tim koji ne postoji, daje praznu listu, ne grešku. Admin nema poseban filtar "bez tima": korisnike bez tima vidi kad filtra nema.
+10. Popis timova za filtar: admin dobiva sve timove, ostali timove u kojima su član.
+11. Kad zahtjev ili korisnik ne postoji: 404; kad postoji, ali ga korisnik ne smije vidjeti: 403, kao u T5 i T6 (L23, točka 3). Popisi nikad ne daju 403, nego praznu listu.
+12. Frontend nudi otkazivanje za zahtjeve na čekanju i odobrene; je li odobreni počeo, odlučuje backend (409, `Request has already started`), a ekran prikaže poruku. `<Request>` ne dobiva posebno polje "smije se otkazati".
+13. Filtriranje je u Javi iz svih zahtjeva, kao u T5 (L24, točka 2); dovoljno za POC od oko 20 korisnika (Q53.1).
+
+- tester: 1: OK, Q44–Q46 (zaposlenik vidi svoje zahtjeve sa svim detaljima).
+- tester: 2: OK, specifikacija 7 (voditelj i admin vide zahtjeve s detaljima), Q16, Q17 (saldo članova, svi saldi).
+- tester: 3: OK, slaže se sa specifikacijom 7, kalendar: voditelj "za ostale timove u kojima je član vidi isto što i zaposlenik".
+- tester: 4: OK, specifikacija 7 kaže "sve zahtjeve članova timova koje vodi"; D2 (zahtjev voditelja ide adminu) je samo odobravanje.
+- tester: 5: OK, specifikacija 7: zaposlenik u više timova vidi se na kalendaru svakog svog tima (s filtrom), bez filtra jednom.
+- tester: 6: OK, brief: kolege vide samo ime i datume; Q42 za voditelja traži samo tip.
+- tester: 7: OK, Q47 (bez tipa i zahtjeva na čekanju).
+- tester: 8: OK.
+- tester: 9: OK, Q43 (admin bez filtra vidi sve, i korisnike bez tima; filtar po timu).
+- tester: 10: OK, Q3 (voditelj je član timova koje vodi), D12 (jedan kalendar s filtrom).
+- tester: 11: OK, isto kao L23, točka 3; specifikacija 8 razlikuje 403 i 404.
+- tester: 12: OK, R7 i Q23 provjerava backend (T6); frontend samo prikaže poruku.
+- tester: 13: OK, Q53.1.
+- tester: testovi za T7 su u `VisibilityApiTest.java` i `CalendarApiTest.java`; pokrivaju 3–5, 7, 9–11 izravno.
+
+**Odluka:** Svih trinaest pretpostavki vrijedi.
+**Zašto:** Developer i tester se slažu; sve se slaže sa specifikacijom 7 (Vidljivost) i sučeljem T7, nema konflikta.
+**Gdje:** sučelje T7 (bez izmjena); testovi `VisibilityApiTest.java`, `CalendarApiTest.java`
+
+## L28 · odlučeno (orkestrator, Rajko pregledava) · T7 · specifikacija 12 (Approvals), Q16
+
+**Problem** (developer): Specifikacija ne kaže treba li ekran Approvals uz zahtjev za godišnji pokazati saldo podnositelja (koliko mu dana ostaje). Voditelj smije vidjeti saldo članova svog tima (Q16), a endpoint za to T7 dodaje (`GET /api/users/{id}/balance`), ali specifikacija 12 za Approvals navodi samo popis zahtjeva na čekanju s odobravanjem i odbijanjem. Odluka utječe samo na frontend (T8).
+
+**Odluka:** Ekran Approvals ne pokazuje saldo podnositelja. Endpoint `GET /api/users/{id}/balance` ostaje u API-ju.
+**Zašto:** Specifikacija 12 za Approvals navodi samo popis zahtjeva na čekanju s odobravanjem i odbijanjem; 80/20. Saldo na Approvals ekranu je proširenje za README.
+**Gdje:** T8 (Approvals ekran bez salda)
+
+## L29 · riješeno · T7 · pretpostavke
+
+**Problem** (developer): Kod za T7 radi po još nekoliko pretpostavki koje nigdje nisu izrečene. Neka se potvrde ili isprave:
+
+1. Vidljivost i kalendar imaju dva controllera: `VisibilityController` (`/api/me/requests`, `/api/requests`, `/api/requests/{id}`, `/api/users/{id}/balance`) i `CalendarController` (`/api/calendar`, `/api/teams`), kao što svaki task ima svoj controller (L26, točka 3).
+2. Ključevi `type` i `status` izostaju iz JSON-a jer API piše unos kalendara kroz svoj zapis koji preskače prazne vrijednosti (L27, točka 7). Servisni `CalendarEntry` ostaje bez JSON oznaka (arhitektura: servis ne zna za HTTP).
+3. "`viewer` je `owner`" (Vidljivost, red 1) uspoređuje id-jeve korisnika, jer se u servisu ne može koristiti usporedba iz domene (L13).
+4. Kad `month` nedostaje ili nije `yyyy-MM` (npr. `2026-13`), ili `teamId` nije broj, status je 400, a `detail` je Springova zadana poruka, kao `id` koji nije broj u T5 (L24, točka 3).
+5. Ako prijavljeni korisnik nestane iz baze usred poziva, odgovor je 500, kao u T2–T6 (L24, točka 4).
+
+- tester: OK: 1–5. Novi testovi ne trebaju: 2 već provjeravaju testovi s točnim popisom ključeva (`LIMITED_KEYS`, npr. `ivanSeesColleaguesApprovedWithoutTypeAndStatus_Q47`); 3 API testovi i tako učitavaju korisnika odvojeno (`ivanSeesOwnPendingAndApprovedWithTypeAndStatus_Q41`, `requestDetailOnlyWithFullAccess_brief`); uz 4 `missingOrInvalidMonthIsBadRequest_T7` i `nonNumericTeamIdIsBadRequest_T7` traže samo da `detail` spominje ime polja (`month`, `teamId`), što Springova zadana poruka radi.
+
+**Odluka:** Svih pet pretpostavki vrijedi.
+**Zašto:** Developer i tester se slažu; nema konflikta sa specifikacijom 7 ni sučeljem T7, a postojeći testovi već pokrivaju 2–4.
+**Gdje:** kod T7 (bez izmjena sučelja ni testova)
+
+## L30 · riješeno · T7 · specifikacija 7 (Kalendar, Voditelj), Q42, Q47
+
+**Problem** (reviewer, važno, za testera): Nijedan test ne provjerava što voditelj vidi o timu u kojem je samo član, a ne voditelj. Specifikacija 7 kaže da tamo "vidi isto što i zaposlenik": samo odobrene, samo ime i datume (Q47: kolege bez tipa i bez zahtjeva na čekanju). Ana se dodaje u Mobile u `lukaSeesAnaFullWhenAnaIsInMobile_D2` (`CalendarApiTest.java`) i `lukaSeesAnaWhenAnaIsInMobileButCannotApprove_D2` (`VisibilityApiTest.java`), ali se gleda samo što Luka i Sara vide o Ani, ne što Ana vidi o Sari i Tomu. Zato bi prošao i kod koji voditelju daje pun pristup u svakom timu u kojem je član (Sarin `PENDING` s tipom na Aninom kalendaru, Sarini zahtjevi i saldo u `GET /api/requests` i `GET /api/users/{id}/balance`). Prijedlog: test u kojem je Ana u Mobileu, a Sara ima `PENDING` i `APPROVED`; Ana na kalendaru vidi samo Sarin `APPROVED` s ključevima `LIMITED_KEYS`, a na Sarin zahtjev i saldo dobiva 403.
+
+- tester: slažem se; dodana dva testa u kojima je Ana u Mobileu: na kalendaru vidi samo Sarin odobreni, bez tipa i stanja, a Sarine zahtjeve (i odobrene) ni saldo ne vidi (403, nema je u `GET /api/requests`).
+
+**Odluka:** Dodani testovi da voditelj u timu u kojem je samo član vidi isto što i zaposlenik.
+**Zašto:** Specifikacija 7 (voditelj za ostale timove u kojima je član vidi isto što i zaposlenik), Q47 (kolege bez tipa i bez zahtjeva na čekanju); bez testa bi prošao kod koji voditelju daje pun pristup u svakom svom timu.
+**Gdje:** `CalendarApiTest.java`: `anaInMobileSeesSaraOnlyApprovedWithoutTypeAndStatus_Q47`; `VisibilityApiTest.java`: `anaInMobileCannotSeeSarasRequestsOrBalance_Q47`

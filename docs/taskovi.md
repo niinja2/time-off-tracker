@@ -21,6 +21,6 @@ Cjelina se može razbiti na manje taskove kad krene rad.
 | T4 | Kreiranje zahtjeva i validacija | 3 API, 4 Servisi | gotovo |
 | T5 | Odobravanje i odbijanje | 3 API, 4 Servisi | gotovo |
 | T6 | Otkazivanje | 3 API, 4 Servisi | gotovo |
-| T7 | Vidljivost i kalendar | 3 API, 4 Servisi | čeka |
+| T7 | Vidljivost i kalendar | 3 API, 4 Servisi | gotovo |
 | T8 | Frontend, 3 ekrana | 1 Frontend | čeka |
 | T9 | Docker i README; backend u Composeu dobiva `JWT_SECRET` iz `.env` (u `.gitignore`, uz `.env.example`), bez zadane šifre (L14) | | čeka |
