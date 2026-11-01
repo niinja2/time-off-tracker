@@ -23,6 +23,20 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+/**
+ * T6 Otkazivanje zahtjeva: POST /api/requests/{id}/cancel.
+ *
+ * Izvori: specifikacija 4; sučelje T6 (Ovlasti, Provjere) i T5 (Ovlasti); L25, L26.
+ * Mreža: uloga (vlasnik: zaposlenik, voditelj, admin; tko smije odobriti: voditelj tima,
+ *   voditelj preko drugog tima, admin; tko ne smije: kolega, voditelj drugog tima,
+ *   voditelj na zahtjev voditelja, voditelj na zahtjev bez tima, zaposlenik na zahtjev voditelja)
+ *   × stanje (PENDING, APPROVED, REJECTED, CANCELLED)
+ *   × početak (prije danas, danas, sutra; na čekanju i s prošlim datumima)
+ *   × razlog (bez tijela, {}, null, prazan, razmaci, 1, 500 i 501 znak);
+ *   id (nije broj, negativan, ne postoji); bez prijave;
+ *   redoslijed provjera: 1 prije 2, 2 prije 3, 3 prije 4, 5 i 6, 4 prije 5 i 6.
+ * Pokriva: R4, R6, R7, Q4, Q23, Q30, Q30.1, Q31, Q31.1, Q32, D2, D3, D14, T6
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
 class CancelApiTest {
@@ -120,6 +134,16 @@ class CancelApiTest {
     }
 
     @Test
+    void anaCancelsOwnRequestWithoutReason_R6() throws Exception {
+        long id = request("ana", "PENDING");
+
+        HttpResponse<String> response = cancel("ana", id, "");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(statusOf(id)).isEqualTo("CANCELLED");
+    }
+
+    @Test
     void ownerCancelsPastPendingRequest_R6() throws Exception {
         long id = insertRequest(
             "ivan",
@@ -164,7 +188,7 @@ class CancelApiTest {
         assertThat(statusOf(id)).isEqualTo("APPROVED");
     }
 
-    // Q30, Q31, Q32, D14: tko smije odobriti, smije otkazati, uz razlog
+    // Q30, Q31, Q32, D14, D2, Q4: tko smije odobriti, smije otkazati, uz razlog
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"PENDING", "APPROVED"})
@@ -193,6 +217,58 @@ class CancelApiTest {
         assertThat(cancellerOf(id)).isEqualTo(userId("eva"));
     }
 
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"ana", "eva"})
+    void approverCancelsApprovedRequestStartingTomorrow_Q32(String actor) throws Exception {
+        long id = insertRequest(
+            "ivan",
+            "2026-10-31",
+            "2026-11-06",
+            "APPROVED");
+
+        HttpResponse<String> response = cancel(actor, id, REASON);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(statusOf(id)).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void approverCancelsPastPendingRequest_Q30() throws Exception {
+        long id = insertRequest(
+            "ivan",
+            "2026-01-05",
+            "2026-01-09",
+            "PENDING");
+
+        HttpResponse<String> response = cancel("ana", id, REASON);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(statusOf(id)).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void evaCancelsAnasRequestWithReason_D2() throws Exception {
+        long id = request("ana", "PENDING");
+
+        HttpResponse<String> response = cancel("eva", id, REASON);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(cancellerOf(id)).isEqualTo(userId("eva"));
+    }
+
+    @Test
+    void onlyAdminCancelsRequestOfUserWithoutTeam_Q4() throws Exception {
+        jdbc.update("INSERT INTO users (username, name, password_hash, hire_date)"
+            + " VALUES ('nina', 'Nina', 'x', '2020-01-01')");
+        long id = request("nina", "PENDING");
+
+        HttpResponse<String> anaResponse = cancel("ana", id, REASON);
+        HttpResponse<String> evaResponse = cancel("eva", id, REASON);
+
+        assertProblem(anaResponse, 403, FORBIDDEN);
+        assertThat(evaResponse.statusCode()).isEqualTo(200);
+    }
+
     @Test
     void lukaCancelsIvanWhenIvanIsAlsoInMobile_D14() throws Exception {
         addMember("Mobile", "ivan");
@@ -217,6 +293,17 @@ class CancelApiTest {
     }
 
     @Test
+    void reasonOfOneCharacterIsAccepted_D3() throws Exception {
+        long id = request("ivan", "PENDING");
+
+        HttpResponse<String> response = cancel("ana", id, "{\"reason\":\"x\"}");
+        String body = response.body();
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<String>read(body, "$.cancelReason")).isEqualTo("x");
+    }
+
+    @Test
     void evaCannotCancelSarasRequestWithoutReason_D3() throws Exception {
         long id = request("sara", "APPROVED");
 
@@ -228,12 +315,17 @@ class CancelApiTest {
 
     // Q30.1, Q31.1: ni voditelj ni admin ne otkazuju odobreni zahtjev koji je počeo
 
-    @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {"ana", "eva"})
-    void approverCannotCancelStartedApprovedRequest_Q30_1(String actor) throws Exception {
+    @ParameterizedTest(name = "{0}, start {1}")
+    @CsvSource({
+        "ana, 2026-10-30",
+        "ana, 2026-10-26",
+        "eva, 2026-10-30",
+        "eva, 2026-10-26"
+    })
+    void approverCannotCancelStartedApprovedRequest_Q30_1(String actor, String start) throws Exception {
         long id = insertRequest(
             "ivan",
-            "2026-10-30",
+            start,
             "2026-11-06",
             "APPROVED");
 
@@ -250,7 +342,8 @@ class CancelApiTest {
         "luka, ivan",
         "marko, ivan",
         "luka, ana",
-        "ana, eva"
+        "ana, eva",
+        "ivan, ana"
     })
     void userWhoCannotApproveCannotCancel_D14(String actor, String owner) throws Exception {
         long id = request(owner, "PENDING");
@@ -279,6 +372,17 @@ class CancelApiTest {
         long id = request("ivan", status);
 
         HttpResponse<String> response = cancel("ivan", id, "");
+
+        assertProblem(response, 409, "Request cannot change from " + status + " to CANCELLED");
+        assertThat(statusOf(id)).isEqualTo(status);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"REJECTED", "CANCELLED"})
+    void approverCannotCancelFinishedRequest_R4(String status) throws Exception {
+        long id = request("ivan", status);
+
+        HttpResponse<String> response = cancel("ana", id, REASON);
 
         assertProblem(response, 409, "Request cannot change from " + status + " to CANCELLED");
         assertThat(statusOf(id)).isEqualTo(status);
@@ -365,6 +469,13 @@ class CancelApiTest {
     }
 
     @Test
+    void negativeIdIsNotFound_T6() throws Exception {
+        HttpResponse<String> response = cancel("ivan", -1, "");
+
+        assertProblem(response, 404, NOT_FOUND);
+    }
+
+    @Test
     void cancelWithoutTokenIsUnauthorized_T6() throws Exception {
         long id = request("ivan", "PENDING");
 
@@ -397,6 +508,28 @@ class CancelApiTest {
         long id = request("ivan", "PENDING");
 
         HttpResponse<String> response = cancel("luka", id, "");
+
+        assertProblem(response, 403, FORBIDDEN);
+    }
+
+    @Test
+    void permissionIsCheckedBeforeStart_T6() throws Exception {
+        long id = insertRequest(
+            "ivan",
+            "2026-10-26",
+            "2026-11-06",
+            "APPROVED");
+
+        HttpResponse<String> response = cancel("luka", id, REASON);
+
+        assertProblem(response, 403, FORBIDDEN);
+    }
+
+    @Test
+    void permissionIsCheckedBeforeStatus_T6() throws Exception {
+        long id = request("ivan", "REJECTED");
+
+        HttpResponse<String> response = cancel("luka", id, REASON);
 
         assertProblem(response, 403, FORBIDDEN);
     }
@@ -467,6 +600,7 @@ class CancelApiTest {
         jdbc.update("DELETE FROM team_members"
             + " WHERE team_id = (SELECT id FROM teams WHERE name = 'Mobile')"
             + " AND user_id IN (SELECT id FROM users WHERE username IN ('ana', 'ivan'))");
+        jdbc.update("DELETE FROM users WHERE username = 'nina'");
     }
 
     private String statusOf(long id) {

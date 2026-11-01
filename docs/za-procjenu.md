@@ -32,3 +32,18 @@ Prijedlozi koji još nisu odlučeni. Kad se odluče, idu u README, taskove ili l
 ## Dokumentacija
 
 - Previše fajlova: procijeniti što se može spojiti ili arhivirati (npr. duplicirani "Krug po cjelini" u taskovi.md i way-of-working.md).
+
+## Neovisni review (Shiva, DeepSeek), otvoreno
+
+Riješeno prije slanja: dijagrami (Q51), izbor biblioteka u README-u, Q18 u D5, D17 za L39, brojke i naredbe u README-u, E2E 344/345.
+
+- **Otkazivanje tuđeg zahtjeva na čekanju kroz UI** (Q30, Q31, D14): API to radi, ekran ne. T8.1 je pokrio samo odobrene.
+- **Razlog otkazivanja se ne vidi** kad postoji komentar odluke (My time off).
+- **R5 u API sloju**, D3 u servisu: dva slična pravila u dva sloja (arhitektura kaže da API nema pravila).
+- **Vidljivost na kalendaru** je djelomično if-ovi; uvjet "PENDING ili APPROVED" ponovljen na dva mjesta.
+- **Tumačenja odgovora naručitelja** koja nisu potvrđena: D3 (obavezan razlog, Q37), D10 (bez popisa korisnika, Q49.1), D7 na Q53.3 ("?"), D4 (Q19.1), D8 (Q24), Q39 (preklapanje po radnim danima, kod broji kalendarske).
+- **Odbijeni odgovori naručitelja kao proširenja:** prijenos (Q14, Q18), zahtjev preko godine (Q28), bolovanje preko godišnjeg (Q57).
+- **Dokumenti na hrvatskom**, a specifikacija 8 kaže sve na engleskom (Q54).
+- **Zastarjeli dokumenti:** arhitektura (RequestController.approve, save, uloga), taskovi.md (tester vidi i frontend/tests, "svaka uloga u svom chatu", revieweri), sučelje T1/T2 (findByStatus, /error), zaglavlje specifikacije ("nacrt za potvrdu"), frontend/README.md (predložak).
+- **Coding log:** stanja L14, L28, L32 "odlučeno" iako napravljeno; "zamijenjeno" nije dopušteno stanje; nema coding-log-arhiva.md.
+- **UI bez pogleda za Q16/Q17** (salde članova, svi zahtjevi tima): samo API.

@@ -176,6 +176,7 @@ Kolega ih je opisao u odgovorima, ali ih ne radimo u POC-u. Opisujemo ih u READM
 | <a id="d14"></a>🟪 `D14` | Tko smije odobriti zahtjev, smije ga i otkazati | [🟩 `Q30`](atomarna-pitanja.md#q30) i [🟩 `Q31`](atomarna-pitanja.md#q31) dopuštaju otkazivanje voditelju i adminu. Jedno pravilo umjesto dva, pa se ne sudara s [🟪 `D2`](#d2): voditelj ne otkazuje zahtjev drugog voditelja |
 | <a id="d15"></a>🟪 `D15` | Admin smije odobriti vlastiti zahtjev bilo kojeg tipa | [🟩 `Q1.1`](atomarna-pitanja.md#q1-1) pitao je samo za godišnji. Jedno pravilo, bez provjere tipa |
 | <a id="d16"></a>🟪 `D16` | Seed: lozinka `password` za sve; datum zaposlenja 2020-01-01 za sve osim Toma (2026-06-01) | Specifikacija nije određivala vrijednosti. Ista lozinka je najjednostavniji način da se djeluje kao svaki korisnik ([🟦 `brief`](brief.md)); Tom pokazuje razmjerni saldo u godini zaposlenja ([🟩 `Q15`](atomarna-pitanja.md#q15)): 7 mjeseci, 12 dana |
+| <a id="d17"></a>🟪 `D17` | Voditelj i admin otkazuju tuđi odobreni zahtjev koji nije počeo kroz ekran Approvals (tablica "Approved requests", razlog obavezan) | [🟩 `Q30`](atomarna-pitanja.md#q30), [🟩 `Q31`](atomarna-pitanja.md#q31), [🟩 `Q32`](atomarna-pitanja.md#q32): naručitelj dopušta otkazivanje tuđeg zahtjeva, pa ga korisnik mora moći napraviti u aplikaciji (L39, T8.1). Otkazivanje tuđeg zahtjeva na čekanju kroz UI još nije napravljeno (samo API) |
 
 ## 11. Odstupanja od briefa
 
@@ -195,12 +196,12 @@ Za README. Slijedimo odgovor naručitelja, a ne brief.
 Tri ekrana iz briefa ([🟦 `brief`](brief.md)):
 
 1. **My time off:** moji zahtjevi sa stanjem, forma za novi zahtjev, otkazivanje i saldo godišnjeg.
-2. **Approvals:** samo za voditelje i admine; zahtjevi na čekanju koje smiju odobriti, s odobravanjem i odbijanjem.
+2. **Approvals:** samo za voditelje i admine; zahtjevi na čekanju koje smiju odobriti, s odobravanjem i odbijanjem; ispod njih odobreni tuđi zahtjevi koje smiju otkazati, a nisu počeli ([🟪 `D17`](#d17)).
 3. **Team calendar:** tko je odsutan u odabranom mjesecu, po pravilima vidljivosti; popis po danima.
 
 Kad backend odbije zahtjev, ekran prikazuje poruku greške, npr. preklapanje ili premašen saldo ([🟦 `brief`](brief.md)).
 
 ## 13. Otvoreno
 
-- Dijagrami tokova i sekvencijski dijagrami ([🟩 `Q51`](atomarna-pitanja.md#q51)).
+- ~~Dijagrami tokova i sekvencijski dijagrami ([🟩 `Q51`](atomarna-pitanja.md#q51))~~: napravljeno u [diagrams.md](../diagrams.md).
 - Gdje se radi promjena uživo na intervjuu.

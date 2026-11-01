@@ -9,10 +9,10 @@ The detailed project documents are in Croatian; this README links to them.
 The main deliverable is the process: several LLM agents build the code in small, separate tasks,
 and talk only through documents. I own the specification.
 
-**Specification first.** The brief was broken into ~50 atomic questions; the client's answers and
-the decisions D1–D16 became the [specification](docs/zajednicko/specifikacija.md). Features that would
+**Specification first.** The brief was broken into ~75 atomic questions; the client's answers and
+the decisions D1–D17 became the [specification](docs/zajednicko/specifikacija.md). Features that would
 add logic and conflicts were cut early and listed as extensions. From the spec came the
-[architecture](docs/arhitektura.md) and the [tasks](docs/taskovi.md) (T1–T9, small and separate).
+[architecture](docs/arhitektura.md) and the [tasks](docs/taskovi.md) (T1–T9 plus T8.1, small and separate).
 The [coding rules](docs/pravila-kodiranja.md) were added separately, as my preference:
 code that a human can read and debug easily.
 
@@ -46,7 +46,8 @@ log entries with problem, decision, why and where.
 **Checks:** ~530 tests (backend through a real PostgreSQL, frontend screens and API client),
 a review after every task, and happy-path user journeys clicked through in a browser
 (5 chains, 345 checks: [scenarios](tester/e2e-scenariji.md), [report](tester/e2e-izvjestaj.md)).
-Result: 345 of 345 passed, after one wrong check in a scenario was corrected (the app was right).
+Result: 344 of 345 passed. The one failure was a wrong check in the scenario, not in the app
+(the saved page text shows the expected behaviour); the check was corrected afterwards but not re-run.
 The journeys are written so a human can follow them by hand. This first run was done by an LLM (Haiku);
 the next step is a script (Playwright) that runs the same steps on demand or on a schedule.
 
@@ -54,7 +55,7 @@ Details and the role prompts: [way-of-working.md](docs/way-of-working.md).
 
 ### Who owns what
 
-- I own the specification: the brief, the client questions and the decisions D1–D16.
+- I own the specification: the brief, the client questions and the decisions D1–D17.
 - The coding log owns the code. Every implementation choice (42 entries, a few hundred assumptions)
   is written there with why and where, and most were settled by the agents themselves.
   That is why the log is so detailed: it is the documentation a fresh chat or a person needs
@@ -109,10 +110,25 @@ Compose refuses to start without `JWT_SECRET`; there is no default, because a se
 
 ## Test
 
+From the repository root (backend tests need Docker running, Testcontainers starts PostgreSQL):
+
 ```sh
-cd backend && ./mvnw test     # needs Docker running (Testcontainers starts PostgreSQL)
-cd frontend && npm ci && npm test
+(cd backend && ./mvnw test)
+(cd frontend && npm ci && npm test)
 ```
+
+## Choices
+
+| What | Why |
+| --- | --- |
+| Spring Boot (Java 21) + Spring Data JPA | the brief's stack; rules live in plain Java services, the database keeps only simple constraints |
+| Flyway | schema and seed as versioned SQL (`V1__schema.sql`, `V2__seed.sql`), so every start gives the same database |
+| Spring Security OAuth2 resource server (JWT) | stateless login with a signed token; the token carries only who you are, roles and teams are read from the database on every call (L9), so a correction in the database (D6) counts at once |
+| ProblemDetail (`application/problem+json`) | one error format for every 400/401/403/404/409 (D11) |
+| Testcontainers | backend tests run against a real PostgreSQL 17, not an in-memory substitute |
+| Next.js (TypeScript) + Tailwind | the brief's stack; the frontend proxies `/api` to the backend, so no CORS is needed |
+| Vitest + React Testing Library | fast frontend tests with a fake `fetch`, no backend needed |
+| Docker Compose | the client asked for Docker (Q53); one command starts database, backend and frontend |
 
 ## Seeded users
 
@@ -133,7 +149,7 @@ Usernames are case-sensitive. The seed has no requests (D9: seed without demo re
 
 ## API
 
-JWT in `Authorization: Bearer <token>`; errors are `application/problem+json` (D11) with 400 / 401 / 403 / 404 / 409. Full contract: [sucelje.md](docs/zajednicko/sucelje.md).
+JWT in `Authorization: Bearer <token>`; errors are `application/problem+json` (D11) with 400 / 401 / 403 / 404 / 409. Full contract: [sucelje.md](docs/zajednicko/sucelje.md). Flow and sequence diagrams (the client asked for these instead of Swagger, Q51): [diagrams.md](docs/diagrams.md).
 
 | Endpoint | What |
 | --- | --- |
@@ -149,12 +165,15 @@ JWT in `Authorization: Bearer <token>`; errors are `application/problem+json` (D
 
 ## Decisions and assumptions
 
-- Decisions D1–D16: [specification](docs/zajednicko/specifikacija.md), section 10.
+- Decisions D1–D17: [specification](docs/zajednicko/specifikacija.md), section 10.
 - Deviations from the brief, based on the client's answers: section 11.
 - Assumptions made while coding: the "pretpostavke" entries in the [coding log](docs/zajednicko/coding-log.md), one per task.
 
 **Why no carry-over (D5).** The brief says 20 days per calendar year (R11), so each year has its own
-20 days and a request uses the balance of the year it falls in. The client's answers describe carry-over:
+20 days and a request uses the balance of the year it falls in. This is a deliberate deviation:
+asked which year's balance a request uses (Q18), the client answered "the current one, and days left
+from the previous year are used first". "Current" only differs for requests in next year, and
+"previous year first" is carry-over. The client's answers describe carry-over:
 unused days move to the next year, are valid until 30 June, and the oldest days are used first.
 That is not one rule but several new pieces of logic (a balance per year of origin, an expiry date,
 an order of use), and each of them collides with rules that already exist:
@@ -207,7 +226,6 @@ Where each one would go is in the specification, section 9.
 
 ## What's next
 
-- Flow and sequence diagrams for the main rules.
 - The extensions above, starting with carry-over and public holidays.
 - Audit history per request and a notification to the team lead (optional extras from the brief).
 - End-to-end tests against the running Compose stack.

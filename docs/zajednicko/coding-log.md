@@ -601,3 +601,26 @@ Format:
 **Odluka:** Sve četiri pretpostavke vrijede.
 **Zašto:** Developer i tester se slažu; nema konflikta. Stari podaci i upisane vrijednosti ostaju kao u T8 (upisane vrijednosti forme ostaju kad akcija padne).
 **Gdje:** kod T8.1 (bez izmjena sučelja); `frontend/tests/ApprovalsScreen.test.tsx`: četiri testa s oznakama L42.1 i L42.3
+
+## L43 · otvoreno · T6 · R4
+
+**Problem** (reviewer testera, manje važno, za testera): Dva testa nose oznaku pravila koje ne provjeravaju. `finishedRequestCannotBeCancelled_R4` (`CancelApiTest.java:375`) i `approverCannotCancelFinishedRequest_R4` (`CancelApiTest.java:386`) provjeravaju da se odbijeni ili otkazani zahtjev ne može otkazati. R4 govori o odobravanju i odbijanju, ne o otkazivanju: "Only pending requests can be approved or rejected." (`brief.md:72`; `specifikacija.md:59`: "Odobrava se i odbija samo zahtjev na čekanju"). Otkazivanje završenog zahtjeva je provjera 6 iz sučelja T6 (`sucelje.md:416`: "Zahtjev je `REJECTED` ili `CANCELLED` | 409"), koja nema oznaku pravila. Testovi očekuju točno ono što kaže sučelje; kriva je samo oznaka. Prijedlog: oznaka `_T6`, kao ostale provjere iz sučelja u istoj klasi, i R4 izbaciti iz `Pokriva` (`CancelApiTest.java:38`). Ista oznaka za otkazivanje postoji i u T1 (`domain/TimeOffRequestTest.java:146`, `cancelledRequestCannotChangeAgain_R4`); to je izvan T6, samo napomena.
+
+## L44 · otvoreno · T6 · Q30, Q32
+
+**Problem** (reviewer testera, manje važno, za testera): Test nosi oznaku Q30 (voditelj otkazuje tuđi zahtjev), a pola njegovih slučajeva pripada Q32 (voditelj ili admin povlači dano odobrenje). `anaCancelsIvansRequestWithReason_Q30` (`CancelApiTest.java:197–199`) vrti se za `PENDING` i `APPROVED`. Specifikacija ih dijeli: na čekanju Q30, Q31, a odobren koji nije počeo Q32 (`specifikacija.md:70`: "Odobren, nije počeo | Otkazuje, razlog obavezan (Q32, D3, D14)"). Testovi s oznakom `_Q32` (`approverCancelsApprovedRequestStartingTomorrow_Q32`, `CancelApiTest.java:226`) gledaju samo status, ne `cancelReason` i `cancelledById`, pa tu provjeru za odobrene radi samo test s oznakom Q30. Prijedlog: razdvojiti u dva testa, `PENDING` s oznakom `_Q30` i `APPROVED` s oznakom `_Q32`, s istim provjerama.
+
+## L45 · otvoreno · T6 · metodologija
+
+**Problem** (reviewer testera, važno, za testera): Zaglavlje kaže da su ispunjene sve kombinacije, a testovi pokrivaju samo dio. `Mreža` (`CancelApiTest.java:30–35`) piše uloga × stanje × početak × razlog, a metodologija pod tim podrazumijeva sve ostvarive kombinacije (`TESTING_METHODOLOGY.md:19`: "N×N×N and beyond: all viable combinations"). `Ne pokriva` (`CancelApiTest.java:39–42`) ne kaže da kombinacije nedostaju. Primjeri kombinacija bez testa:
+
+1. Vlasnik voditelj (Ana) i vlasnik admin (Eva) samo na `PENDING` (`:131`, `:141`); nema odobrenog koji počinje sutra ili danas, ni odbijenog.
+2. Voditelj preko drugog tima (Luka, Ivan u Mobileu) samo na `PENDING` s razlogom (`:277`); nema odobrenog ni slučaja bez razloga.
+3. Admin nijednom na `REJECTED` ili `CANCELLED` (`:386` ide samo s Anom).
+4. Razlog `null`, 500 i 501 znak samo kad otkazuje voditelj (`:289`, `:427`, `:437`), nikad kad otkazuje vlasnik.
+
+Prijedlog: ili popuniti mrežu, ili u `Mreža` napisati koje su kombinacije odabrane (npr. "parovi"), a ostale navesti u `Ne pokriva`.
+
+## L46 · otvoreno · T6 · Q23, D8, Q24
+
+**Problem** (reviewer testera, manje važno, za testera): Zaglavlje `CancelDayBoundaryApiTest` ne navodi pravilo koje test zapravo provjerava. Test postavlja sat na 23:30 UTC, što je u Zagrebu već sljedeći dan, pa provjerava u kojoj se zoni računa "danas" (`CancelDayBoundaryApiTest.java:24`: "danas je datum u Zagrebu, ne u UTC-u"). To pravilo dolazi iz D8 (vremenska zona se postavlja varijablom `TZ`, Europe/Zagreb), Q24 (u kojoj se zoni računa "danas") i sučelja T3, Današnji datum (`sucelje.md:200`: "Datum se računa u zoni sata (`LocalDate.now(clock)`), ne u zoni računala"). `Izvori` (`:26`) navode samo specifikaciju 4 i sučelje T6, a `Pokriva` (`:29`) samo Q23 (zahtjev koji počinje danas je počeo). Prijedlog: u `Izvori` dodati sučelje T3 (Današnji datum), a u `Pokriva` i u komentar odjeljka (`:68`) dodati D8 i Q24.

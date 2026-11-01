@@ -15,7 +15,7 @@ Izvor scenarija: `tester/e2e-scenariji.md`. Dokazi (doslovni `get_page_text` isp
 
 Svi koraci su izvedeni. Nijedan korak nije preskocen. Jedina PALO stavka: D4, korak 5, `NEMA: 2026-12-09 (dan 2026-12-09)`.
 
-**Naknadno (orkestrator):** PALO je greška u scenariju, ne u aplikaciji. Tomov odobreni godišnji 2026-12-01 do 16 pokriva i 2026-12-09, pa dan postoji; Ivana na kalendaru nema (`NEMA: Ivan` PROSLO). Stavka je u scenariju zamijenjena s `MORA: Tom (Vacation, Approved) (dan 2026-12-09)`, što dokaz `D4-5.txt` potvrđuje. Rezultat prema ispravljenom scenariju: 345 PROSLO, 0 PALO.
+**Naknadno (orkestrator):** PALO je greška u scenariju, ne u aplikaciji. Tomov odobreni godišnji 2026-12-01 do 16 pokriva i 2026-12-09, pa dan postoji; Ivana na kalendaru nema (`NEMA: Ivan` PROSLO). Stavka je u scenariju zamijenjena s `MORA: Tom (Vacation, Approved) (dan 2026-12-09)`, što dokaz `D4-5.txt` potvrđuje. Scenarij nije ponovo izvršen: izvršeno je 344 PROSLO, 1 PALO.
 
 Napomene o mjerenju:
 - Trajanje je procjena iz vremena zapisa dokaza, ne mjerenje sata.
