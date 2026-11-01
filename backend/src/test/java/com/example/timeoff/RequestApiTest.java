@@ -34,6 +34,7 @@ class RequestApiTest {
     private static final String ONE_YEAR = "Request must be within one calendar year";
     private static final String NO_WORKING_DAY = "Request must contain at least one working day";
     private static final String REASON_TOO_LONG = "reason size must be between 0 and 500";
+    private static final String NOT_JSON = "Request body is not valid JSON";
 
     @TestConfiguration(proxyBeanMethods = false)
     static class FixedClockConfiguration {
@@ -224,15 +225,25 @@ class RequestApiTest {
         assertBadField(response, "startDate");
     }
 
+    // L52: tijelo koje nije JSON ima svoju poruku, jer nema polja koje bi se imenovalo
     @Test
     void bodyThatIsNotJsonIsBadRequest_T4() throws Exception {
-        HttpResponse<String> response = api.post("/api/requests", api.tokenOf("ivan"), "not json");
-        String contentType = response.headers()
-            .firstValue("Content-Type")
-            .orElse("");
+        String token = api.tokenOf("ivan");
 
-        assertThat(response.statusCode()).isEqualTo(400);
-        assertThat(contentType).startsWith("application/problem+json");
+        HttpResponse<String> response = api.post("/api/requests", token, "not json");
+
+        assertProblem(response, 400, NOT_JSON);
+        assertThat(requestCount()).isZero();
+    }
+
+    // L51, L52: bez tijela je 400, ne 500, s istom porukom
+    @Test
+    void requestWithoutBodyIsBadRequest_T4() throws Exception {
+        String token = api.tokenOf("ivan");
+
+        HttpResponse<String> response = api.post("/api/requests", token, "");
+
+        assertProblem(response, 400, NOT_JSON);
         assertThat(requestCount()).isZero();
     }
 

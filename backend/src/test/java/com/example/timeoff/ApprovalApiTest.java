@@ -33,6 +33,7 @@ class ApprovalApiTest {
     private static final String FORBIDDEN = "You cannot approve or reject this request";
     private static final String NOT_FOUND = "Request not found";
     private static final String BLANK_COMMENT = "comment must not be blank";
+    private static final String NOT_JSON = "Request body is not valid JSON";
     private static final String COMMENT = "{\"comment\":\"Busy week\"}";
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -437,6 +438,22 @@ class ApprovalApiTest {
         HttpResponse<String> response = api.post("/api/requests/abc/approve", token, "");
 
         assertThat(response.statusCode()).isEqualTo(400);
+    }
+
+    // L52: tijelo koje nije JSON ima svoju poruku, i kod odobravanja i kod odbijanja
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"approve", "reject"})
+    void bodyThatIsNotJsonIsBadRequest_T5(String action) throws Exception {
+        long id = pending("ivan");
+
+        HttpResponse<String> response = decide(
+            "ana",
+            id,
+            action,
+            "not json");
+
+        assertProblem(response, 400, NOT_JSON);
+        assertThat(statusOf(id)).isEqualTo("PENDING");
     }
 
     // Q35, Q36: zahtjev na čekanju iz prošlosti smije se odobriti

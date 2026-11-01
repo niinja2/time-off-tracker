@@ -126,6 +126,32 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+			<plugin>
+				<groupId>org.pitest</groupId>
+				<artifactId>pitest-maven</artifactId>
+				<version>1.19.1</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.pitest</groupId>
+						<artifactId>pitest-junit5-plugin</artifactId>
+						<version>1.2.3</version>
+					</dependency>
+				</dependencies>
+				<configuration>
+					<threads>8</threads>
+					<timestampedReports>true</timestampedReports>
+					<reportsDirectory>${project.basedir}/pit-reports</reportsDirectory>
+					<historyInputFile>${project.basedir}/.pit-history</historyInputFile>
+					<historyOutputFile>${project.basedir}/.pit-history</historyOutputFile>
+					<mutators>
+						<mutator>STRONGER</mutator>
+					</mutators>
+					<outputFormats>
+						<param>XML</param>
+						<param>HTML</param>
+					</outputFormats>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 

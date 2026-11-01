@@ -26,16 +26,25 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * T6 Otkazivanje zahtjeva: POST /api/requests/{id}/cancel.
  *
- * Izvori: specifikacija 4; sučelje T6 (Ovlasti, Provjere) i T5 (Ovlasti); L25, L26.
- * Mreža: uloga (vlasnik: zaposlenik, voditelj, admin; tko smije odobriti: voditelj tima,
- *   voditelj preko drugog tima, admin; tko ne smije: kolega, voditelj drugog tima,
- *   voditelj na zahtjev voditelja, voditelj na zahtjev bez tima, zaposlenik na zahtjev voditelja)
- *   × stanje (PENDING, APPROVED, REJECTED, CANCELLED)
- *   × početak (prije danas, danas, sutra; na čekanju i s prošlim datumima)
- *   × razlog (bez tijela, {}, null, prazan, razmaci, 1, 500 i 501 znak);
- *   id (nije broj, negativan, ne postoji); bez prijave;
- *   redoslijed provjera: 1 prije 2, 2 prije 3, 3 prije 4, 5 i 6, 4 prije 5 i 6.
- * Pokriva: R4, R6, R7, Q4, Q23, Q30, Q30.1, Q31, Q31.1, Q32, D2, D3, D14, T6
+ * Izvori: specifikacija 4; sučelje T6 (Endpoint, Ovlasti, Provjere) i T5 (Ovlasti); L25, L26, L47, L52.
+ * Mreža: odabrane kombinacije, ne sve.
+ *   Vlasnik: Ivan na čekanju (bez tijela; s razlogom; {}, prazan i razmaci spremaju null;
+ *   prošli datumi), Ana i Eva na čekanju bez tijela; Ivan odobren (počinje sutra 200,
+ *   danas i prije danas 409); Ivan odbijen i otkazan 409.
+ *   Tko smije odobriti, s razlogom: Ana na Ivanov (na čekanju, odobren, na čekanju s prošlim
+ *   datumima, odbijen i otkazan 409); Ana i Eva na Ivanov odobren (sutra 200, danas i prije
+ *   danas 409); Eva na Sarin odobren i Anin na čekanju; Luka na Ivanov kad je Ivan i u Mobileu;
+ *   korisnik bez tima: Eva 200, Ana 403.
+ *   Razlog kad Ana otkazuje Ivanov na čekanju: bez tijela, {}, null, prazan, razmaci 400;
+ *   1 i 500 znakova 200; 501 znak 400. Eva na Sarin odobren bez razloga 400.
+ *   Tko ne smije, na čekanju, 403: Luka na Ivanov, Marko na Ivanov, Luka na Anin (i kad je Ana
+ *   u Mobileu), Ana na Evin, Ivan na Anin.
+ *   Odgovor bez otkazivanja: novi zahtjev i odobren zahtjev imaju polja otkazivanja null.
+ *   Saldo nakon otkazivanja odobrenog i čekajućeg godišnjeg.
+ *   Ulaz: id nije broj, negativan, ne postoji; tijelo nije JSON; bez prijave.
+ *   Redoslijed provjera, po jedan par: 1 prije 2, 2 prije 3, 3 prije 4, 3 prije 5, 3 prije 6,
+ *   4 prije 5, 4 prije 6.
+ * Pokriva: R6, R7, Q4, Q23, Q30, Q30.1, Q31, Q31.1, Q32, D2, D3, D14, T6
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
@@ -48,6 +57,7 @@ class CancelApiTest {
     private static final String NOT_FOUND = "Request not found";
     private static final String BLANK_REASON = "reason must not be blank";
     private static final String STARTED = "Request has already started";
+    private static final String NOT_JSON = "Request body is not valid JSON";
     private static final String REASON = "{\"reason\":\"Plans changed\"}";
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -190,20 +200,22 @@ class CancelApiTest {
 
     // Q30, Q31, Q32, D14, D2, Q4: tko smije odobriti, smije otkazati, uz razlog
 
-    @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {"PENDING", "APPROVED"})
-    void anaCancelsIvansRequestWithReason_Q30(String status) throws Exception {
-        long id = request("ivan", status);
+    @Test
+    void anaCancelsIvansPendingRequestWithReason_Q30() throws Exception {
+        long id = request("ivan", "PENDING");
 
         HttpResponse<String> response = cancel("ana", id, REASON);
-        String body = response.body();
 
-        assertThat(response.statusCode()).isEqualTo(200);
-        Number cancelledById = JsonPath.read(body, "$.cancelledById");
-        assertThat(JsonPath.<String>read(body, "$.status")).isEqualTo("CANCELLED");
-        assertThat(JsonPath.<String>read(body, "$.cancelReason")).isEqualTo("Plans changed");
-        assertThat(cancelledById.longValue()).isEqualTo(userId("ana"));
-        assertThat(cancellerOf(id)).isEqualTo(userId("ana"));
+        assertCancelledByWithReason(response, id, "ana");
+    }
+
+    @Test
+    void anaCancelsIvansApprovedRequestWithReason_Q32() throws Exception {
+        long id = request("ivan", "APPROVED");
+
+        HttpResponse<String> response = cancel("ana", id, REASON);
+
+        assertCancelledByWithReason(response, id, "ana");
     }
 
     @Test
@@ -364,11 +376,11 @@ class CancelApiTest {
         assertProblem(response, 403, FORBIDDEN);
     }
 
-    // R4: odbijeni i otkazani zahtjev ne mijenjaju se
+    // Provjera 6: odbijeni i otkazani zahtjev ne mogu se otkazati
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"REJECTED", "CANCELLED"})
-    void finishedRequestCannotBeCancelled_R4(String status) throws Exception {
+    void finishedRequestCannotBeCancelled_T6(String status) throws Exception {
         long id = request("ivan", status);
 
         HttpResponse<String> response = cancel("ivan", id, "");
@@ -379,7 +391,7 @@ class CancelApiTest {
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"REJECTED", "CANCELLED"})
-    void approverCannotCancelFinishedRequest_R4(String status) throws Exception {
+    void approverCannotCancelFinishedRequest_T6(String status) throws Exception {
         long id = request("ivan", status);
 
         HttpResponse<String> response = cancel("ana", id, REASON);
@@ -417,6 +429,46 @@ class CancelApiTest {
         assertThat(JsonPath.<Integer>read(body, "$.remaining")).isEqualTo(20);
     }
 
+    // T6 Endpoint, L47: dok zahtjev nije otkazan ni odlučen, ta polja su null, ne broj
+
+    @Test
+    void newPendingRequestHasNoCancellerAndNoDecider_T6() throws Exception {
+        String token = api.tokenOf("ivan");
+        String json = "{\"type\":\"VACATION\",\"startDate\":\"2026-11-02\",\"endDate\":\"2026-11-06\",\"reason\":\"Trip\"}";
+
+        HttpResponse<String> response = api.post("/api/requests", token, json);
+        String body = response.body();
+
+        assertThat(response.statusCode()).isEqualTo(201);
+        Object cancelledById = JsonPath.read(body, "$.cancelledById");
+        Object cancelReason = JsonPath.read(body, "$.cancelReason");
+        Object cancelledAt = JsonPath.read(body, "$.cancelledAt");
+        Object decidedById = JsonPath.read(body, "$.decidedById");
+        assertThat(cancelledById).isNull();
+        assertThat(cancelReason).isNull();
+        assertThat(cancelledAt).isNull();
+        assertThat(decidedById).isNull();
+    }
+
+    @Test
+    void approvedRequestHasNoCanceller_T6() throws Exception {
+        long id = request("ivan", "PENDING");
+        String token = api.tokenOf("ana");
+
+        HttpResponse<String> response = api.post("/api/requests/" + id + "/approve", token, "");
+        String body = response.body();
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        Number decidedById = JsonPath.read(body, "$.decidedById");
+        Object cancelledById = JsonPath.read(body, "$.cancelledById");
+        Object cancelReason = JsonPath.read(body, "$.cancelReason");
+        Object cancelledAt = JsonPath.read(body, "$.cancelledAt");
+        assertThat(decidedById.longValue()).isEqualTo(userId("ana"));
+        assertThat(cancelledById).isNull();
+        assertThat(cancelReason).isNull();
+        assertThat(cancelledAt).isNull();
+    }
+
     // Oblik ulaza
 
     @Test
@@ -440,13 +492,14 @@ class CancelApiTest {
         assertThat(statusOf(id)).isEqualTo("PENDING");
     }
 
+    // L52: tijelo koje nije JSON ima svoju poruku
     @Test
     void bodyThatIsNotJsonIsBadRequest_T6() throws Exception {
         long id = request("ivan", "PENDING");
 
         HttpResponse<String> response = cancel("ivan", id, "not json");
 
-        assertThat(response.statusCode()).isEqualTo(400);
+        assertProblem(response, 400, NOT_JSON);
         assertThat(statusOf(id)).isEqualTo("PENDING");
     }
 
@@ -625,6 +678,18 @@ class CancelApiTest {
         assertThat(response.statusCode()).isEqualTo(status);
         assertThat(contentType).startsWith("application/problem+json");
         assertThat(actualDetail).isEqualTo(detail);
+    }
+
+    private void assertCancelledByWithReason(HttpResponse<String> response, long id, String actor) {
+        String body = response.body();
+        Number cancelledById = JsonPath.read(body, "$.cancelledById");
+        long actorId = userId(actor);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(JsonPath.<String>read(body, "$.status")).isEqualTo("CANCELLED");
+        assertThat(JsonPath.<String>read(body, "$.cancelReason")).isEqualTo("Plans changed");
+        assertThat(cancelledById.longValue()).isEqualTo(actorId);
+        assertThat(cancellerOf(id)).isEqualTo(actorId);
     }
 
     private void assertBadField(HttpResponse<String> response, String field) {

@@ -114,6 +114,14 @@ class AuthApiTest {
         assertThat(problemDetail(response, 400)).contains(field);
     }
 
+    // L51: login bez tijela nema ni username ni password, pa je 400, ne 500
+    @Test
+    void loginWithoutBodyIsBadRequest_T2() throws Exception {
+        HttpResponse<String> response = post("/api/auth/login", "");
+
+        problemDetail(response, 400);
+    }
+
     @Test
     void loginTokenCarriesIdentityClaims_T2() throws Exception {
         SignedJWT jwt = SignedJWT.parse(tokenOf("ivan"));

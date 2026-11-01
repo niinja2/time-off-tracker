@@ -52,6 +52,22 @@ class TimeOffRequestTest {
         assertThat(request.isPending()).isTrue();
     }
 
+    // L49: zahtjev koji je odobren, odbijen ili otkazan nije na čekanju
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"APPROVED", "REJECTED", "CANCELLED"})
+    void requestThatLeftPendingIsNotPending_T1(Status status) {
+        TimeOffRequest request = pendingRequest();
+
+        switch (status) {
+            case APPROVED -> request.approve(ana, null, DECIDED);
+            case REJECTED -> request.reject(ana, "No", DECIDED);
+            default -> request.cancel(ivan, null, DECIDED);
+        }
+
+        assertThat(request.getStatus()).isEqualTo(status);
+        assertThat(request.isPending()).isFalse();
+    }
+
     @Test
     void onlyOwnerIsSubmitter_Q29() {
         TimeOffRequest request = pendingRequest();

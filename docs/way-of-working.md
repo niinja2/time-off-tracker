@@ -13,8 +13,9 @@ Sudac ponašanja je [specifikacija](zajednicko/specifikacija.md). Tester ne vidi
 2. **Pretpostavke (tester).** Pročita sučelje i pretpostavke i na svaku odgovori u logu, jednim retkom (OK ili prigovor). Prigovore developer i tester rješavaju u logu, najviše dva kruga; sudac je specifikacija. Kad se slože, upišu Odluku, Zašto i Gdje.
 3. **Testovi (tester).** Piše testove iz specifikacije i sučelja, po [metodologiji](../tester/TESTING_METHODOLOGY.md) (cilj 99:1; popis u sučelju je minimum). Testovi moraju pasti, jer koda još nema.
 4. **Kod (developer).** Piše kod dok svi testovi ne prođu. Kod testova ne čita, gleda samo ispis (ime testa, očekivano, dobiveno). Testove ne mijenja. Ako mu test izgleda kriv, upiše unos u log; tester odgovori, i test mijenja tester, samo ako se slože da je kriv. Pretpostavke koda koje nisu u sučelju upiše kao još jedan unos "pretpostavke", na koji tester odgovara kao u koraku 2.
-5. **Review (reviewer).** Pregleda kod i testove taska na tri razine: linija (pravila kodiranja), funkcija (pravila iz specifikacije, oznake R, Q, D), cjelina (slojevi, fali li nešto). Svaki nalaz upiše u log s težinom (blokira ili važno) i kaže za koga je (developer ili tester). Oni odgovaraju u logu dok reviewer nije zadovoljan.
-6. **Popravci.** Developer popravlja kod, tester testove; svi testovi moraju ponovo proći. Zatim ponovo reviewer.
+4a. **Mutacije (stroj).** Kad svi testovi prođu, developer pokrene PIT samo nad klasama taska (`-DtargetClasses`; testovi se ne ograničavaju). Izvještaj ne tumači; task ide revieweru. Puni PIT nad cijelim backendom pokreće se jednom dnevno, ako se radilo: orkestrator kaže developeru "puni PIT", a revieweru "review mutacija za cijeli backend". Uloge znaju samo svoj dio; ritam zna orkestrator. PIT radi na 8 threadova (`<threads>` u `backend/pom.xml`; svaki thread diže svoj Spring i Postgres, oko 1 GB RAM-a); broj se mijenja samo u `pom.xml`, jer ga `-Dthreads` u naredbi ne pregazi.
+5. **Review (reviewer).** Pregleda kod i testove taska na četiri razine: linija (pravila kodiranja), funkcija (pravila iz specifikacije, oznake R, Q, D), cjelina (slojevi, fali li nešto), mutacije (preživjele mutacije iz PIT izvještaja razvrsta na rupu u testu, kod bez pravila ili mrtav kod). Svaki nalaz upiše u log s težinom (blokira ili važno) i kaže za koga je (developer ili tester). Oni odgovaraju u logu dok reviewer nije zadovoljan.
+6. **Popravci.** Developer popravlja kod, tester testove; svi testovi moraju ponovo proći i PIT se ponovo pokreće. Zatim ponovo reviewer.
 7. **Commit.** Kad reviewer kaže "nema nalaza", task se označi gotovim u [taskovima](taskovi.md) i commita.
 
 Pitanja ponašanja koja specifikacija ne pokriva i sporovi nakon dva kruga idu orkestratoru i vlasniku specifikacije. Odluka koja mijenja ponašanje ulazi i u specifikaciju kao nova D-odluka.
@@ -39,7 +40,7 @@ Ako se ne slože ni nakon dva kruga:
 | --- | --- | --- | --- |
 | Developer | sučelje, pa kod | specifikacija, pravila kodiranja, arhitektura, taskovi | `docs/zajednicko/sucelje.md`, kod, unosi u log |
 | Tester | testove | specifikacija, metodologija testiranja, sučelje | testovi, unosi u log |
-| Reviewer | review na razini linije, funkcije i cjeline | kod, specifikacija, pravila kodiranja, arhitektura | nalazi u logu |
+| Reviewer | review na razini linije, funkcije, cjeline i mutacija | kod, specifikacija, pravila kodiranja, arhitektura, PIT izvještaj | nalazi u logu |
 | Orkestrator (Rajko, uz glavni chat) | redoslijed, odluke o ponašanju | sve | odluke u logu |
 
 ## Promptovi
@@ -62,9 +63,13 @@ Način rada:
 - Svaki task ima dva koraka, svaki tek kad ti kažem:
   1. Sučelje: opišeš ga u docs/zajednicko/sucelje.md (odjeljak za task), bez koda.
   2. Kod: pišeš iz specifikacije i sučelja. Ne čitaš kod testova.
-     Pokreneš ./mvnw test. Kad test padne, gledaš samo ispis (ime testa, očekivano, dobiveno).
+     Za vrijeme rada možeš puštati samo testove vezane za task (./mvnw test -Dtest=...). Kad test padne, gledaš samo ispis (ime testa, očekivano, dobiveno).
      Popraviš i ponavljaš dok sve ne prođe. Testove ne mijenjaš.
      Ako misliš da je test kriv, stani i upiši unos u docs/zajednicko/coding-log.md.
+     Kad si gotov, pusti sve testove (./mvnw test). Kad svi prođu, pokreni PIT nad klasama koje si u tasku napisao ili mijenjao:
+     ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage -DtargetClasses=<klase taska, zarezom>
+     Bez -DtargetTests. Izvještaj ne tumači i ništa ne mijenjaj zbog njega; task ide revieweru.
+     Kad ti se kaže "puni PIT": obriši backend/.pit-history i pokreni istu naredbu bez -DtargetClasses.
 - Ako je specifikacija nejasna, ne odlučuj sam: upiši unos u docs/zajednicko/coding-log.md, s oznakom (R, Q, D).
 - Ne commitaš.
 - Primjedbe prvo pokušaj objasniti u plain language.
@@ -123,10 +128,19 @@ Prije svega pročitaj:
 
 Ne počinji dok ti ne kažem koji task pregledavaš.
 
-Pregledavaš samo kod zadanog taska, na tri razine:
+Pregledavaš samo kod zadanog taska, na četiri razine:
 1. Linija: pravila kodiranja (gniježđenje, imena, više od tri argumenta).
 2. Funkcija: radi li funkcija ono što pravilo iz specifikacije traži (oznaka R, Q, D).
 3. Cjelina: jesu li slojevi poštovani i fali li nešto što task traži.
+4. Mutacije: pročitaj mutations.xml iz najnovijeg podfoldera u backend/pit-reports/ (ime foldera je datum i vrijeme pokretanja). Ako ga nema, ako je stariji od koda ili testova taska, ili ako ne sadrži klase taska, reci to u završnom odgovoru i preskoči ovu razinu.
+   Nalaz o mutaciji zatvaraš tek kad noviji izvještaj pokaže da je uhvaćena; dok ga nema, unos ostaje otvoren.
+   Uzmi mutacije sa statusom SURVIVED ili NO_COVERAGE u klasama koje je task napisao ili mijenjao; u ostalim klasama samo one kojih nema u logu.
+   Prije razvrstavanja provjeri u coding logu je li ista mutacija (klasa, metoda, vrsta mutacije; redak se može pomaknuti) već PRIHVAĆENA. Ako jest, preskoči je.
+   Ostale otvori na fajl:redak i razvrstaj:
+   - rupa u testu: ponašanje je u specifikaciji, ali ga nijedan test ne provjerava. Za testera, kao ponašanje s oznakom i tekstom pravila, bez koda i bez imena klasa i metoda.
+   - kod bez pravila: ponašanje nije u specifikaciji. Za vlasnika.
+   - mrtav ili ekvivalentan kod: za developera, ili PRIHVAĆENO uz jednu rečenicu zašto.
+   Nijedna mutacija ne smije ostati nerazvrstana. U log upiši i jedan redak sažetka: broj mutacija, ubijenih, preživjelih, neizvršenih.
 
 Svaki nalaz upisuješ kao novi unos na dno coding loga, po formatu, s težinom:
 - blokira: krši specifikaciju ili ruši aplikaciju

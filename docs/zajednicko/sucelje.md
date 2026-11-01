@@ -238,7 +238,7 @@ Provjere idu ovim redom; prva koja padne određuje odgovor. Sve greške su `appl
 
 | # | Provjera | Status | `detail` |
 | --- | --- | --- | --- |
-| 1 | Nedostaje `type`, `startDate` ili `endDate`; nepoznat `type`; datum nije datum; tijelo nije JSON | 400 | koje polje nije ispravno |
+| 1 | Nedostaje `type`, `startDate` ili `endDate`; nepoznat `type`; datum nije datum; tijelo nije JSON ili nedostaje | 400 | koje polje nije ispravno; kad tijelo nije JSON ili nedostaje: `Request body is not valid JSON` (L52) |
 | 2 | `reason` dulji od 500 znakova | 400 | `reason size must be between 0 and 500` |
 | 3 | `endDate` prije `startDate` (R8: završni datum nije prije početnog) | 400 | `End date must not be before start date` |
 | 4 | `startDate` i `endDate` u različitim godinama (specifikacija 5: zahtjev je unutar jedne kalendarske godine) | 400 | `Request must be within one calendar year` |
@@ -327,7 +327,7 @@ Redom; prva koja padne određuje odgovor. Greške su `application/problem+json`.
 
 | # | Provjera | Status | `detail` |
 | --- | --- | --- | --- |
-| 1 | `id` nije broj; tijelo nije JSON; `comment` dulji od 500 znakova | 400 | koje polje nije ispravno |
+| 1 | `id` nije broj; tijelo nije JSON; `comment` dulji od 500 znakova | 400 | koje polje nije ispravno; kad tijelo nije JSON: `Request body is not valid JSON` (L52) |
 | 2 | Odbijanje bez `comment`, s praznim ili samo s razmacima (R5: odbijanje traži komentar) | 400 | `comment must not be blank` |
 | 3 | Zahtjev s tim `id` ne postoji | 404 | `Request not found` |
 | 4 | Korisnik ne smije odlučiti (Ovlasti) | 403 | `You cannot approve or reject this request` |
@@ -408,7 +408,7 @@ Redom; prva koja padne određuje odgovor. Greške su `application/problem+json`.
 
 | # | Provjera | Status | `detail` |
 | --- | --- | --- | --- |
-| 1 | `id` nije broj; tijelo nije JSON; `reason` dulji od 500 znakova | 400 | koje polje nije ispravno |
+| 1 | `id` nije broj; tijelo nije JSON; `reason` dulji od 500 znakova | 400 | koje polje nije ispravno; kad tijelo nije JSON: `Request body is not valid JSON` (L52) |
 | 2 | Zahtjev s tim `id` ne postoji | 404 | `Request not found` |
 | 3 | Korisnik ne smije otkazati (Ovlasti) | 403 | `You cannot cancel this request` |
 | 4 | Otkazuje netko tko nije vlasnik, bez `reason`, s praznim ili samo s razmacima (D3) | 400 | `reason must not be blank` |

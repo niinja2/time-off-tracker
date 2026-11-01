@@ -160,7 +160,7 @@ Format:
 **Zašto:** Servisi učitavaju prijavljenog korisnika i vlasnika zahtjeva odvojeno (L12, točka 1), pa bi usporedba samo po objektu istu osobu proglasila drugom; nespremljeni korisnici bez broja ne smiju ispasti ista osoba.
 **Gdje:** `domain/User.java` (`isSameAs`, `leads`, `isMemberOf`), `domain/TimeOffRequest.java` (`isSubmittedBy`)
 
-## L14 · odlučeno · T2 · pretpostavke
+## L14 · riješeno · T2 · pretpostavke
 
 **Problem** (developer): Kod za T2 radi po još nekoliko pretpostavki koje nigdje nisu izrečene. Neka se potvrde ili isprave:
 
@@ -386,7 +386,7 @@ Format:
 **Zašto:** Developer i tester se slažu; sve se slaže sa specifikacijom 7 (Vidljivost) i sučeljem T7, nema konflikta.
 **Gdje:** sučelje T7 (bez izmjena); testovi `VisibilityApiTest.java`, `CalendarApiTest.java`
 
-## L28 · odlučeno (orkestrator) · T7 · specifikacija 12 (Approvals), Q16
+## L28 · riješeno (orkestrator) · T7 · specifikacija 12 (Approvals), Q16
 
 **Problem** (developer): Specifikacija ne kaže treba li ekran Approvals uz zahtjev za godišnji pokazati saldo podnositelja (koliko mu dana ostaje). Voditelj smije vidjeti saldo članova svog tima (Q16), a endpoint za to T7 dodaje (`GET /api/users/{id}/balance`), ali specifikacija 12 za Approvals navodi samo popis zahtjeva na čekanju s odobravanjem i odbijanjem. Odluka utječe samo na frontend (T8).
 
@@ -453,7 +453,7 @@ Format:
 **Zašto:** Developer i tester se slažu; sve se slaže sa specifikacijom 7 i 12, arhitekturom (sloj 1: frontend ne odlučuje) i odlukama L28, L32, L33.
 **Gdje:** sučelje T8 (bez izmjena); testovi u `frontend/tests/`
 
-## L32 · odlučeno (orkestrator) · T8 · Q46, Q30, Q31, specifikacija 7
+## L32 · riješeno (orkestrator) · T8 · Q46, Q30, Q31, specifikacija 7
 
 **Problem** (developer): Specifikacija 7 kaže da zaposlenik vidi svoje zahtjeve "uključujući tko je odlučio i tko je otkazao" (Q46: tko je odlučio; Q30, Q31: tko je otkazao). API (T5, T6) za to vraća samo broj korisnika (`decidedById`, `cancelledById`), ne ime, pa ekran My time off ne može napisati "Approved by Ana". Pitanje: treba li My time off prikazati ime onoga tko je odlučio ili otkazao? Ako da, backend bi u `<Request>` dodao `decidedByName` i `cancelledByName` (kao `ownerName` u T5); ako ne, ekran to ne prikazuje, a podatak ostaje u API-ju. Dok se ne odluči, sučelje T8 to ne prikazuje.
 
@@ -461,13 +461,15 @@ Format:
 **Zašto:** Specifikacija 7 izričito kaže da zaposlenik vidi tko je odlučio i tko je otkazao (Q46, Q30, Q31); broj korisnika to ne pokazuje. Promjena je mala i u postojećem `<Request>`.
 **Gdje:** sučelje T7 `<Request>` (dva nova polja), sučelje T8 My time off; backend test i frontend test (tester)
 
-## L33 · zamijenjeno s L39 · T8 · specifikacija 4, specifikacija 12, Q30, Q31, Q32, D14
+## L33 · odbačeno · T8 · specifikacija 4, specifikacija 12, Q30, Q31, Q32, D14
 
 **Problem** (developer): Voditelj i admin smiju otkazati tuđi zahtjev, uz razlog (specifikacija 4; Q30, Q31, Q32: voditelj i admin otkazuju; D14: tko smije odobriti, smije i otkazati). Specifikacija 12 ne daje im za to ekran: Approvals ima samo zahtjeve na čekanju s odobravanjem i odbijanjem, a My time off samo vlastite. Pitanje: treba li frontend ponuditi otkazivanje tuđih zahtjeva (npr. odobrenih) ili to ostaje samo u API-ju (`POST /api/requests/{id}/cancel`)? Dok se ne odluči, sučelje T8 ga nema (80/20).
 
 **Odluka:** Ne. Otkazivanje tuđih zahtjeva ostaje samo u API-ju (`POST /api/requests/{id}/cancel`); frontend ga nema.
 **Zašto:** Specifikacija 12 za to ne daje ekran; 80/20. Ekran za to je proširenje za README.
 **Gdje:** sučelje T8 (bez promjene)
+
+**Zašto (odbačeno):** Zamijenjeno s L39.
 
 ## L34 · riješeno · T8 · pretpostavke
 
@@ -602,15 +604,29 @@ Format:
 **Zašto:** Developer i tester se slažu; nema konflikta. Stari podaci i upisane vrijednosti ostaju kao u T8 (upisane vrijednosti forme ostaju kad akcija padne).
 **Gdje:** kod T8.1 (bez izmjena sučelja); `frontend/tests/ApprovalsScreen.test.tsx`: četiri testa s oznakama L42.1 i L42.3
 
-## L43 · otvoreno · T6 · R4
+## L43 · riješeno · T6 · R4
 
 **Problem** (reviewer testera, manje važno, za testera): Dva testa nose oznaku pravila koje ne provjeravaju. `finishedRequestCannotBeCancelled_R4` (`CancelApiTest.java:375`) i `approverCannotCancelFinishedRequest_R4` (`CancelApiTest.java:386`) provjeravaju da se odbijeni ili otkazani zahtjev ne može otkazati. R4 govori o odobravanju i odbijanju, ne o otkazivanju: "Only pending requests can be approved or rejected." (`brief.md:72`; `specifikacija.md:59`: "Odobrava se i odbija samo zahtjev na čekanju"). Otkazivanje završenog zahtjeva je provjera 6 iz sučelja T6 (`sucelje.md:416`: "Zahtjev je `REJECTED` ili `CANCELLED` | 409"), koja nema oznaku pravila. Testovi očekuju točno ono što kaže sučelje; kriva je samo oznaka. Prijedlog: oznaka `_T6`, kao ostale provjere iz sučelja u istoj klasi, i R4 izbaciti iz `Pokriva` (`CancelApiTest.java:38`). Ista oznaka za otkazivanje postoji i u T1 (`domain/TimeOffRequestTest.java:146`, `cancelledRequestCannotChangeAgain_R4`); to je izvan T6, samo napomena.
 
-## L44 · otvoreno · T6 · Q30, Q32
+- tester: Prihvaćeno. `finishedRequestCannotBeCancelled_T6` i `approverCannotCancelFinishedRequest_T6`; R4 maknut iz `Pokriva`, komentar odjeljka je "Provjera 6". `TimeOffRequestTest` (T1) nije diran, izvan T6 je. Prolaze (70, 1. 11.).
+- reviewer: Provjereno: oznaka R4 više nije ni u imenima testova ni u `Pokriva`.
+
+**Odluka:** Popravljeno.
+**Zašto:** Oznaka sad odgovara provjeri 6 iz sučelja T6.
+**Gdje:** `CancelApiTest.java`
+
+## L44 · riješeno · T6 · Q30, Q32
 
 **Problem** (reviewer testera, manje važno, za testera): Test nosi oznaku Q30 (voditelj otkazuje tuđi zahtjev), a pola njegovih slučajeva pripada Q32 (voditelj ili admin povlači dano odobrenje). `anaCancelsIvansRequestWithReason_Q30` (`CancelApiTest.java:197–199`) vrti se za `PENDING` i `APPROVED`. Specifikacija ih dijeli: na čekanju Q30, Q31, a odobren koji nije počeo Q32 (`specifikacija.md:70`: "Odobren, nije počeo | Otkazuje, razlog obavezan (Q32, D3, D14)"). Testovi s oznakom `_Q32` (`approverCancelsApprovedRequestStartingTomorrow_Q32`, `CancelApiTest.java:226`) gledaju samo status, ne `cancelReason` i `cancelledById`, pa tu provjeru za odobrene radi samo test s oznakom Q30. Prijedlog: razdvojiti u dva testa, `PENDING` s oznakom `_Q30` i `APPROVED` s oznakom `_Q32`, s istim provjerama.
 
-## L45 · otvoreno · T6 · metodologija
+- tester: Prihvaćeno. Razdvojeno u `anaCancelsIvansPendingRequestWithReason_Q30` i `anaCancelsIvansApprovedRequestWithReason_Q32`, s istim provjerama (status, `cancelReason`, `cancelledById`, zapis u bazi) u zajedničkoj pomoćnoj metodi. Prolaze (70, 1. 11.).
+- reviewer: Provjereno: dva testa, na čekanju s oznakom Q30 i odobren s oznakom Q32.
+
+**Odluka:** Popravljeno.
+**Zašto:** Svaki test nosi pravilo koje provjerava.
+**Gdje:** `CancelApiTest.java`
+
+## L45 · riješeno · T6 · metodologija
 
 **Problem** (reviewer testera, važno, za testera): Zaglavlje kaže da su ispunjene sve kombinacije, a testovi pokrivaju samo dio. `Mreža` (`CancelApiTest.java:30–35`) piše uloga × stanje × početak × razlog, a metodologija pod tim podrazumijeva sve ostvarive kombinacije (`TESTING_METHODOLOGY.md:19`: "N×N×N and beyond: all viable combinations"). `Ne pokriva` (`CancelApiTest.java:39–42`) ne kaže da kombinacije nedostaju. Primjeri kombinacija bez testa:
 
@@ -621,6 +637,172 @@ Format:
 
 Prijedlog: ili popuniti mrežu, ili u `Mreža` napisati koje su kombinacije odabrane (npr. "parovi"), a ostale navesti u `Ne pokriva`.
 
-## L46 · otvoreno · T6 · Q23, D8, Q24
+- reviewer: Provjereno na trenutnom `CancelApiTest.java` (1. 11.): nalaz vrijedi. Ispravak: zaglavlje nema odjeljak `Ne pokriva`, pa ga treba dodati ako se mreža ne popunjava. Brojevi redaka u L43–L45 pomaknuli su se za oko 3 (npr. `:372`, `:383` umjesto `:375`, `:386`).
+
+- tester: Odluka vlasnika (1. 11.): `Ne pokriva` se ne vraća, a `Mreža` piše samo odabrane kombinacije, ne sve. `Mreža` u `CancelApiTest.java` prepisana je iz samih testova: za svaku ulogu koja stanja, počeci i razlozi su testirani, i koji parovi provjera. Kombinacije iz točaka 1–4 i dalje nemaju test, ali zaglavlje više ne tvrdi da ih ima. Testovi nisu mijenjani.
+- reviewer: Provjereno: `Mreža` sad nabraja samo testirane kombinacije i ne tvrdi da su sve.
+
+**Odluka:** Zatvoreno po odluci vlasnika: zaglavlje opisuje odabrane kombinacije, testovi se ne dodaju.
+**Zašto:** Zaglavlje više ne tvrdi ono što testovi ne rade.
+**Gdje:** `CancelApiTest.java`, zaglavlje
+
+## L46 · riješeno · T6 · Q23, D8, Q24
 
 **Problem** (reviewer testera, manje važno, za testera): Zaglavlje `CancelDayBoundaryApiTest` ne navodi pravilo koje test zapravo provjerava. Test postavlja sat na 23:30 UTC, što je u Zagrebu već sljedeći dan, pa provjerava u kojoj se zoni računa "danas" (`CancelDayBoundaryApiTest.java:24`: "danas je datum u Zagrebu, ne u UTC-u"). To pravilo dolazi iz D8 (vremenska zona se postavlja varijablom `TZ`, Europe/Zagreb), Q24 (u kojoj se zoni računa "danas") i sučelja T3, Današnji datum (`sucelje.md:200`: "Datum se računa u zoni sata (`LocalDate.now(clock)`), ne u zoni računala"). `Izvori` (`:26`) navode samo specifikaciju 4 i sučelje T6, a `Pokriva` (`:29`) samo Q23 (zahtjev koji počinje danas je počeo). Prijedlog: u `Izvori` dodati sučelje T3 (Današnji datum), a u `Pokriva` i u komentar odjeljka (`:68`) dodati D8 i Q24.
+
+- tester: Djelomično. `Izvori` dobiva sučelje T3 (Današnji datum), a `Pokriva` i komentar odjeljka Q24. D8 nije dodan: test sam postavlja sat sa zonom Europe/Zagreb i ne provjerava varijablu `TZ`, pa D8 ne provjerava. Prolaze (70, 1. 11.).
+- reviewer: Provjereno: dodani su sučelje T3 i Q24. Slažem se da D8 ne ide: test ne provjerava varijablu `TZ`.
+
+**Odluka:** Popravljeno, bez D8.
+**Zašto:** Zaglavlje navodi pravila koja test provjerava.
+**Gdje:** `CancelDayBoundaryApiTest.java`
+
+## L47 · riješeno · T6 · sučelje T6 (Endpoint), mutacije
+
+**Problem** (reviewer, važno, za testera): Nijedan test ne provjerava da zahtjev koji nitko nije otkazao, odnosno o kojem nitko nije odlučio, u odgovoru ima prazno polje za tu osobu, a ne neki broj. Kad bi aplikacija tu vratila 0 umjesto `null`, svi testovi bi i dalje prolazili. Sučelje T6, Endpoint: "Dok zahtjev nije otkazan, sva tri su `null`" (`cancelReason`, `cancelledById`, `cancelledAt`). Isto vrijedi za `decidedById` dok o zahtjevu nitko nije odlučio. Prijedlog: za zahtjev na čekanju provjeriti da su `cancelledById` i `decidedById` `null`, a za odobreni zahtjev koji nije otkazan da je `cancelledById` `null`.
+
+- reviewer: Tester je dodao dva testa: novi zahtjev na čekanju nema ni otkazivača ni onoga tko je odlučio, a odobreni zahtjev nema otkazivača. Testovi provjeravaju točno ono što sučelje traži i prolaze (Rajko, 1. 11.).
+
+**Odluka:** Rupa je zatvorena.
+**Zašto:** Mutacija iz L47 (0 umjesto `null`) sada ruši test za zahtjev na čekanju.
+**Gdje:** `CancelApiTest.java`, odjeljak "T6 Endpoint, L47"
+
+## L48 · riješeno · T6 · mutacijsko testiranje
+
+**Problem** (tester, za reviewera): PIT (STRONGER) nad T6 napravio je 49 mutacija: 39 uhvaćeno, 0 preživjelo, 10 bez pokrivenosti. Po klasama (DEFAULTS): `CancelService` 7 bez pokrivenosti, jedna klasa u `api` 1, `ApprovalPolicy` i `CancelPolicy` 0. Tester ne vidi kod. Za svaku od 10 mutacija neka reviewer običnim riječima upiše:
+
+1. **fali test:** koje ponašanje i koji ulaz, s oznakom iz specifikacije ili sučelja ako postoji;
+2. **ne treba test:** kod je nedostupan kroz API ili mutacija ne mijenja ponašanje, uz razlog.
+
+Ako mutaciju već pokriva L47, dovoljno je napisati "vidi L47". Kod se ne prepisuje u log.
+
+Report: `backend/target/pit-reports/index.html` (pokretanje: `./mvnw test-compile org.pitest:pitest-maven:mutationCoverage`).
+
+- reviewer: Svih 10 mutacija je **ne treba test u T6**. Nijedna nije u otkazivanju (T6). Sve su u popisu odobrenih zahtjeva koje prijavljeni smije otkazati (`GET /api/approvals/cancellable`, sučelje T8.1), koji je u iste klase dodan u T8.1. Po klasama je 9 u servisu i 1 u `api`, ne 7 i 1. Mutacije provjeravaju uvjete s tog popisa: samo `APPROVED`, ne vlastiti, smije otkazati, nije počeo, i da popis nije prazan. U PIT-u za T6 nad cijelim paketom testova (`backend/target/pit-reports/T6/`, 20:12) svih 10 je uhvaćeno, a uhvatili su ih testovi T8.1. Testerov izvještaj (`backend/target/pit-reports/`, 20:08) te testove nije pokrenuo. Nema veze s L47: L47 je jedina preživjela mutacija u izvještaju za T6.
+
+**Odluka:** Za ovih 10 mutacija ne treba novi test u T6; pokriva ih T8.1.
+**Zašto:** Kod pripada T8.1 i testovi T8.1 ga hvataju (PIT za T6 nad svim testovima: 0 bez pokrivenosti).
+**Gdje:** bez izmjena testova; L47 ostaje otvoren
+
+## L49 · riješeno · cijeli backend · sučelje T1 (Zahtjev), mutacije
+
+**Problem** (reviewer, važno, za testera): Nijedan test ne provjerava da zahtjev koji više nije na čekanju za to i kaže "nije na čekanju". Test provjerava samo novi zahtjev, za koji je odgovor "da". Kad bi odgovor uvijek bio "da", svi testovi bi i dalje prolazili. Sučelje T1, Zahtjev: `isPending()` "je li stanje `PENDING`". Prijedlog: odobren, odbijen i otkazan zahtjev nisu na čekanju.
+
+- tester: Dodan `requestThatLeftPendingIsNotPending_T1` (`domain/TimeOffRequestTest.java`): odobren, odbijen i otkazan zahtjev, `isPending()` je `false` (3 slučaja). Prolazi. Treba ponoviti PIT za cijeli backend da se vidi jesu li obje mutacije uhvaćene.
+- reviewer: Test provjerava ono što traži. Unos ostaje otvoren dok ponovljeni PIT za cijeli backend ne pokaže da su mutacije uhvaćene (izvještaj od 21:25 je stariji od novih testova).
+- reviewer: Mutacije za `isPending` su uhvaćene (PIT 22:21).
+
+**Odluka:** Rupa je zatvorena.
+**Zašto:** Novi test hvata obje mutacije.
+**Gdje:** `domain/TimeOffRequestTest.java`, `requestThatLeftPendingIsNotPending_T1`
+
+## L50 · riješeno · cijeli backend · sučelje T2 (Ključ), L15, mutacije
+
+**Problem** (reviewer, važno, za testera): Nijedan test ne provjerava da se aplikacija ne pokrene sa šifrom za tokene kraćom od 32 bajta. Kad provjera duljine ne bi postojala, ili bi granica bila pomaknuta za jedan, svi testovi bi i dalje prolazili. Sučelje T2, Ključ: "najmanje 32 bajta"; L15: "ispod 32 bajta aplikacija se ne pokrene". Prijedlog: šifra od 31 bajta zaustavi pokretanje s porukom koja to kaže; šifra od točno 32 bajta je ispravna.
+
+- tester: Nova klasa `JwtSecretLengthTest.java`. `secretOf31BytesStopsStartup_T2`: šifra od 31 bajta zaustavi pokretanje, a poruka sadrži "32" i "31" (iz L15). `secretOf32BytesStartsApplication_T2`: 32 bajta pokrene aplikaciju, u 2 slučaja: 32 znaka ASCII i 31 znak od kojih je jedan "č" (32 bajta, jer sučelje T2 broji bajtove u UTF-8, ne znakove). Prolazi. Treba ponoviti PIT za cijeli backend.
+- reviewer: Test provjerava ono što traži. Unos ostaje otvoren dok ponovljeni PIT za cijeli backend ne pokaže da su mutacije uhvaćene (izvještaj od 21:25 je stariji od novih testova).
+- reviewer: Sve tri mutacije provjere duljine su uhvaćene (PIT 22:21). Uhvaćene su i mutacije koje su u L53 bile PRIHVAĆENE (ključ, dekoder, enkoder, lozinke, sat), jer novi test pokreće aplikaciju ispočetka.
+
+**Odluka:** Rupa je zatvorena.
+**Zašto:** Novi test hvata sve tri mutacije granice od 32 bajta.
+**Gdje:** `JwtSecretLengthTest.java`
+
+## L51 · riješeno · cijeli backend · sučelje T4 (Provjere, 1), mutacije
+
+**Problem** (reviewer, važno, za testera): Nijedan test ne šalje zahtjev bez tijela na endpoint kojem tijelo treba. Taj se dio koda nijednom ne izvrši, pa bi aplikacija mogla na takav poziv odgovoriti s 500 i nijedan test to ne bi primijetio. Sučelje T4, provjera 1: "tijelo nije JSON" daje 400. Prijedlog: kreiranje zahtjeva bez tijela daje 400, `application/problem+json`. Isto vrijedi za prijavu bez tijela (T2), ako sučelje T2 to pokriva.
+
+- tester: Dodani `requestWithoutBodyIsBadRequest_T4` (`RequestApiTest.java`: 400, `application/problem+json`, ništa se ne spremi) i `loginWithoutBodyIsBadRequest_T2` (`AuthApiTest.java`: 400, `application/problem+json`; sučelje T2: login bez `username` i `password` je 400). Tekst poruke se ne provjerava dok se ne odluči L52. Prolazi. Treba ponoviti PIT za cijeli backend.
+- reviewer: Test provjerava ono što traži. Unos ostaje otvoren dok ponovljeni PIT za cijeli backend ne pokaže da su mutacije uhvaćene (izvještaj od 21:25 je stariji od novih testova).
+- reviewer: Kod za tijelo koje nedostaje sad se izvršava i mutacija koja bi dala 500 je uhvaćena (PIT 22:21). Ostaje preživjela samo poruka u tom slučaju; ide u L52.
+
+**Odluka:** Rupa je zatvorena; tekst poruke ide u L52.
+**Zašto:** Novi testovi hvataju 500 umjesto 400.
+**Gdje:** `RequestApiTest.java`, `AuthApiTest.java`
+
+## L52 · riješeno · cijeli backend · sučelje T4, T5, T6 (Provjere, 1), mutacije
+
+**Problem** (reviewer, važno, za vlasnika): Nije odlučeno koju poruku dobiva korisnik kad tijelo uopće nije JSON. Sučelja T4, T5 i T6 za provjeru 1 kažu: `detail` je "koje polje nije ispravno". Kad tijelo nije JSON, nema polja koje bi se imenovalo. Kod sam odabire poruku `Request body is not valid JSON`, ali to nigdje ne piše i nijedan test ne provjerava taj tekst. Zato bi poruka mogla biti i `null is invalid` ili ` is invalid`, a testovi bi prolazili. Treba odlučiti tekst. Kad se odluči, upisati ga u sučelje T4 i tester ga testira.
+
+**Odluka:** Kad tijelo nije JSON, odgovor je 400, `application/problem+json`, `detail` = `Request body is not valid JSON`. Vrijedi za kreiranje (T4), odobravanje i odbijanje (T5) i otkazivanje (T6).
+**Zašto:** Nema polja koje bi se imenovalo, pa pravilo "koje polje nije ispravno" tu ne vrijedi. Poruka već postoji u kodu, jasna je i istog je oblika kao ostale (`<što> is invalid`, `... must not be blank`); kod se ne mijenja. Vlasnik, 1. 11.
+**Gdje:** developer upisuje poruku u sučelje T4, T5 i T6, provjera 1; tester dodaje po jedan test za svaki od tri endpointa, zajedno s L51.
+
+- reviewer: Ista poruka vrijedi i kad tijelo potpuno nedostaje (testovi iz L51); kod tada daje istu poruku. Tri mutacije poruke još preživljavaju (PIT 22:21) i bit će uhvaćene kad tester doda provjeru teksta.
+- developer: upisano u sučelje T4, T5 i T6, provjera 1 (`detail` stupac). U T4 vrijedi i za tijelo koje nedostaje. U T5 i T6 tijelo nije obavezno (odobravanje, otkazivanje), a odbijanje bez tijela daje `comment must not be blank` (L24 točka 1), pa tamo stoji samo "tijelo nije JSON". Kod se ne mijenja.
+
+- tester: Tekst `Request body is not valid JSON` provjerava se na sva tri endpointa: `bodyThatIsNotJsonIsBadRequest_T4` i `requestWithoutBodyIsBadRequest_T4` (`RequestApiTest.java`), `bodyThatIsNotJsonIsBadRequest_T5` za `approve` i `reject` (`ApprovalApiTest.java`, novi) i `bodyThatIsNotJsonIsBadRequest_T6` (`CancelApiTest.java`). Prijava bez tijela (L51, T2) i dalje provjerava samo 400 i `application/problem+json`, jer L52 i sučelje T2 ne navode poruku za T2. Prolaze (198, 1. 11.).
+- reviewer: Sučelja i testovi su u redu: tekst se provjerava kad tijelo nije JSON (T4, T5, T6) i kad nedostaje (T4). Unos ostaje otvoren dok ponovljeni PIT ne pokaže da su tri mutacije poruke uhvaćene (izvještaj od 22:21 je stariji od novih testova).
+- reviewer: Ciljani PIT (`backend/target/pit-reports/L52/`, 1. 11. 22:36; samo ta klasa i tri test klase): sve tri mutacije poruke su uhvaćene. Jedna mutacija bez pokrivenosti (poruka za neuspjelu prijavu) posljedica je toga što testovi prijave nisu bili zadani; u PIT-u za cijeli backend (22:21) uhvaćena je.
+
+**Odluka:** Zatvoreno.
+**Zašto:** Testovi provjeravaju tekst poruke i hvataju sve tri mutacije.
+**Gdje:** sučelje T4, T5, T6 (provjera 1); `RequestApiTest.java`, `ApprovalApiTest.java`, `CancelApiTest.java`
+
+## L53 · riješeno · cijeli backend · mutacije
+
+**Problem** (reviewer, za developera i testera): Razvrstavanje mutacija za cijeli backend (`backend/target/pit-reports/mutations.xml`, 1. 11. 21:25).
+
+Sažetak: 323 mutacije, 304 ubijene, 18 preživjelih, 1 neizvršena.
+
+- Rupa u testu: 7 (L49: 2, L50: 3, L51: 2).
+- Kod bez pravila: 2 (L52).
+- PRIHVAĆENO: 10, ispod.
+
+PRIHVAĆENO (klasa, metoda, vrsta mutacije):
+
+1. `SecurityConfig.securityFilterChain`, `jwtKey` (vraćanje ključa), `jwtDecoder`, `jwtEncoder`, `passwordEncoder` i `ClockConfig.clock`: NullReturnVals, 6 mutacija. To su metode koje slažu aplikaciju pri pokretanju. Spring testovi aplikaciju sagrade jednom i dijele je, pa PIT promjenu u tim metodama ne može vidjeti. Ponašanje koje one daju (prijava, token, 401, "danas") testovi T2 i T3 provjeravaju.
+2. `User.isSameAs`, RemoveConditional_EQUAL_IF na provjerama "ima broj", 2 mutacije. Razlika je samo kad se uspoređuje korisnik koji nije spremljen u bazu. Kroz API svaki korisnik dolazi iz baze i ima broj (L13).
+3. `UserExistsJwtConverter.parseUserId`, EmptyObjectReturnVals (0 umjesto `null`), 1 mutacija. Korisnik s brojem 0 ne postoji, pa token s nebrojčanim `sub` i dalje dobiva 401.
+4. `WorkingDays.count`, RemoveConditional_EQUAL_ELSE (kraj prije početka), 1 mutacija. Kroz API je nedostupno: kraj prije početka odbije se prije brojanja dana (R8: početak nije poslije kraja), a spremljeni zahtjevi uvijek imaju ispravan redoslijed.
+
+**Odluka:** Ovih 10 mutacija je PRIHVAĆENO; sljedeći review ih preskače.
+**Zašto:** Ne mijenjaju ponašanje vidljivo kroz API, ili ga PIT zbog dijeljene Spring aplikacije ne može izmjeriti.
+**Gdje:** bez izmjena koda ni testova; otvoreno ostaje L49–L52
+
+## L54 · riješeno · cijeli backend · pravila kodiranja (Stil 1, Stil 2)
+
+**Problem** (reviewer, važno, za testera): Novi testovi iz L50 i L51 na nekoliko mjesta pišu poziv unutar poziva, a na jednom mjestu imaju dvije razine gniježđenja. Takav redak se teže čita: treba ga razmotati da se vidi što se provjerava.
+
+1. Stil 2 (ugniježđeni pozivi rastavljaju se u imenovane varijable):
+   - `RequestApiTest.java:242`, token se dohvaća unutar poziva `post`;
+   - `JwtSecretLengthTest.java`, `secretOf31BytesStopsStartup_T2`: popis poruka se dohvaća unutar `assertThat`;
+   - `JwtSecretLengthTest.java`, `secretOf32BytesStartsApplication_T2`: bajtovi šifre se računaju unutar `assertThat`.
+2. Stil 1 (najviše jedna razina gniježđenja): `JwtSecretLengthTest.java`, `messages`: `if` je unutar `for`.
+
+Prijedlog: svaki unutarnji poziv u svoju varijablu, kao u ostatku testova (L16), a u `messages` preskočiti poruku koja je `null` ranim izlazom ili filtrom.
+
+- tester: Popravljeno. `RequestApiTest.java`: token se dohvaća u svoju varijablu (i u susjednom `bodyThatIsNotJsonIsBadRequest_T4`). `JwtSecretLengthTest.java`: popis poruka i bajtovi šifre su u svojim varijablama, a `messages` je tok bez `for` i `if` (`Stream.iterate`, pa filtar za `null`). Prolaze (198, 1. 11.).
+- reviewer: Provjereno; svi navedeni ugniježđeni pozivi su u svojim varijablama, a `messages` nema gniježđenja.
+
+**Odluka:** Popravljeno.
+**Zašto:** Stil 1 i Stil 2 su poštovani.
+**Gdje:** `RequestApiTest.java`, `JwtSecretLengthTest.java`
+
+## L55 · riješeno · cijeli backend · mutacije
+
+**Problem** (reviewer, za developera i testera): Ponovljeno razvrstavanje mutacija za cijeli backend (`backend/target/pit-reports/mutations.xml`, 1. 11. 22:21).
+
+Sažetak: 323 mutacije, 315 ubijenih, 8 preživjelih, 0 neizvršenih.
+
+- L52 (poruka kad tijelo nije JSON ili nedostaje): 3 mutacije, čekaju test teksta.
+- PRIHVAĆENO iz L53, preskočeno: 5 mutacija (`SecurityConfig.securityFilterChain`, 2 × `User.isSameAs`, `UserExistsJwtConverter.parseUserId`, `WorkingDays.count`).
+- Novih nalaza nema.
+
+**Odluka:** Nema novih unosa; L49–L51 su zatvoreni, L52 i L54 ostaju otvoreni.
+**Zašto:** Sve preživjele mutacije su već razvrstane.
+**Gdje:** bez izmjena koda ni testova
+
+## L56 · riješeno · cijeli backend · mutacije
+
+**Problem** (reviewer, za developera i testera): Puni PIT za cijeli backend (`backend/pit-reports/202611012258/mutations.xml`, 1. 11. 23:07).
+
+Sažetak: 323 mutacije, 317 ubijenih, 2 isteklo vrijeme (PIT ih broji kao uhvaćene), 4 preživjele, 0 neizvršenih.
+
+- Sve 4 preživjele su PRIHVAĆENE u L53 i preskočene (2 × `User.isSameAs`, `UserExistsJwtConverter.parseUserId`, `WorkingDays.count`).
+- Isteklo vrijeme: `SecurityConfig.passwordEncoder` i `securityFilterChain`, prije PRIHVAĆENE u L53; sad su uhvaćene.
+- Izvještaj je počeo prije zadnjih izmjena u `CancelApiTest.java` i `CancelDayBoundaryApiTest.java` (L43–L46). Te izmjene mijenjaju samo imena i zaglavlja testova, a jedan test dijele na dva s istim provjerama, pa ne mijenjaju rezultat mutacija.
+
+**Odluka:** Nema novih nalaza.
+**Zašto:** Svaka preživjela mutacija već je razvrstana.
+**Gdje:** bez izmjena koda ni testova

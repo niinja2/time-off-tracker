@@ -23,10 +23,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * T6 Otkazivanje: "danas" je datum u Zagrebu, ne u UTC-u.
  *
- * Izvori: specifikacija 4; sučelje T6 (provjera 5, "danas" je LocalDate.now(clock)).
- * Mreža: sat 2026-10-30 23:30 UTC, što je u Zagrebu već 31. 10. 00:30
- *   × početak (31. 10., 1. 11.).
- * Pokriva: Q23
+ * Izvori: specifikacija 4; sučelje T6 (provjera 5, "danas" je LocalDate.now(clock)) i T3 (Današnji datum).
+ * Mreža: sat 2026-10-30 23:30 UTC, što je u Zagrebu već 31. 10. 00:30; početak 31. 10. i 1. 11.
+ * Pokriva: Q23, Q24
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
@@ -64,7 +63,7 @@ class CancelDayBoundaryApiTest {
         jdbc.update("DELETE FROM time_off_requests");
     }
 
-    // Q23: zahtjev koji počinje danas je počeo; danas se računa u Zagrebu
+    // Q23, Q24: zahtjev koji počinje danas je počeo; danas se računa u zoni sata (Zagreb)
 
     @Test
     void requestStartingOnZagrebTodayHasStarted_Q23() throws Exception {
