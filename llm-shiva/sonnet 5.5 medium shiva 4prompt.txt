@@ -1,0 +1,380 @@
+===== q-d-r.md =====
+# Q / D / R review
+
+Commit: eb785ba. Datum: 2026-11-01. Necommitane promjene: README.md, docs/za-procjenu.md, docs/zajednicko/specifikacija.md, tester/e2e-izvjestaj.md (M); .claude/, docs/diagrams.md, integrator_report.md, llm-shiva/, shiva_report.md (??). Specifikacija koju sam čitao je necommitana verzija (diff: dodan D17, Approvals u odjeljku 12, Q51 prekrižen). Čitao sam brief.md, atomarna-pitanja.md, specifikacija.md i README.md (samo "Deliberately out" i dijelove koji se pozivaju na Q/D). Kod nisam čitao.
+
+Zadaća 1: provjereno 77 od 77 Q-ova (57 iz iteracije 1, 20 iz iteracije 2). Ne slažu se oni navedeni dolje. Zadaća 2: provjereno 17 od 17 D-ova. Zadaća 4: provjereno 14 od 14 R-ova plus tablica vidljivosti i tablica polja.
+
+## BLOKIRA
+
+Nema. Nijedan odgovor naručitelja ni brief nisu prekršeni bez zapisane odluke; sve što odstupa od odgovora ima D ili stoji u odjeljku 9.
+
+## VAŽNO
+
+1. Q18 odgovor doslovno kaže suprotno od §6 i D5. (specifikacija)
+   - Q18 (atomarna-pitanja.md:70), pitanje "Provjerava li se saldo za godinu u kojoj zahtjev pada, a ne za tekuću godinu?", pretpostavka "Da", odgovor: "Za tekucu, ako ima od prijasnje godine, prijasnji se prvi trosi".
+   - specifikacija.md:94: "Zahtjev za godišnji ne smije premašiti preostali saldo godine u koju pada." i D5 (redak 167): "zahtjev troši saldo godine u koju pada".
+   - Naručitelj je odbacio pretpostavku, a spec je vraća. D5 to pokriva samo tvrdnjom da Q18 "opisuje prijenos". Odstupanje nije u §11. README (redak 172 i dalje) to objašnjava, ali spec §11 ne. Pola tvrdnje je prihvaćeno (prijenos je D7), pola ("tekuća godina") nije raspravljena.
+
+2. Q39 nije prenesen u specifikaciju. (specifikacija)
+   - Q39 (atomarna-pitanja.md:105): "Naša odluka: preklapanje se računa samo po radnim danima".
+   - specifikacija.md:81: "čiji se datumi preklapaju, bez obzira na tip". Pretraga spec fajla za "Q39" daje 0 pogodaka; odluka nije ni u §10 kao D.
+   - Spec doslovno traži preklapanje datuma, odluka kaže radne dane. Dev i tester čitaju samo spec, pa ovisi o tome što su pretpostavili. (Napomena: znam da je tema vikenda zatvorena; ovo je izostavljena odluka, ne novi rubni slučaj.)
+
+3. D10 ukida ono što je naručitelj potvrdio u Q49.1, a D10 se poziva na pogrešan izvor. (specifikacija)
+   - Q49.1 (atomarna-pitanja.md:190): pretpostavka "Da, seedane lozinke; na ekranu prijave popis korisnika za brzi odabir", odgovor "Da".
+   - D10 (specifikacija.md:172): "Ekran prijave je forma ... bez popisa korisnika"; izvor navodi samo brief, ne Q49.1. README redak 135: "no user picker".
+   - Odgovor "Da" prihvaća i popis. Odstupanje nije u §11. Brief dopušta oboje, pa ne krši brief, ali krši odgovor naručitelja bez zapisa.
+
+4. Carry-over (Q14, Q14.1, Q14.2) nije u §11, a README to obećava. (specifikacija, README)
+   - Q14 (redak 66): "Da, kao u Hrvatskoj"; Q14.1 "Yes"; Q14.2 "Nope".
+   - specifikacija.md:96: "prijenos je proširenje (D5)"; §9 redak 154. README:169: "Deviations from the brief, based on the client's answers: section 11." Odjeljak 11 (retci 185-192) ima 6 redaka i nema carry-over ni Q28 ni Q57.
+   - PRIHVAĆENO kao odluka (D7, README "Deliberately out" redak 94), ali je na krivom mjestu: README šalje čitatelja u §11, a tamo toga nema. Isto vrijedi za Q28 (dijeljenje zahtjeva preko granice godine) i Q57 (bolovanje preko godišnjeg): PRIHVAĆENO (§9 redci 156-157, README 223-224), ali ne u §11.
+
+5. Rok i povijest commitova. (log/orkestrator)
+   - Q53.6 (redak 196): "Je li rok od 7 dana (29. listopada) strog? ... Sure". specifikacija.md:144: "Rok je strog: 29. listopada 2026."
+   - `git log`: eb785ba, 78ae305 i 0626ebb imaju datum 2026-10-30; danas je 2026-11-01. Isporuka je po vlastitim dokumentima izvan strogog roka. Ne mogu provjeriti je li rok pomaknut dogovorom.
+
+## SITNO
+
+6. D14 sužava Q30 bez bilješke. Q30 (redak 91) "Smije li voditelj otkazati tuđi zahtjev? ... Moze"; D14 (redak 176): "voditelj ne otkazuje zahtjev drugog voditelja". Isto za Q31 u odnosu na D14: admin smije sve, što je u skladu. §11 redak 190 kaže "Otkazuje i tko smije odobriti", što je točno, ali ne spominje suženje. (specifikacija)
+
+7. D2 se poziva na Q5.1 kao na sukob, a Q5.1 (redak 180) pita samo za zaposlenika u više timova, ne za voditelja. D2 je zapravo izravno R3. (specifikacija)
+
+8. D6 / specifikacija.md:74 pozivaju se na Q30.1 za "izravno u bazi". Q30.1 (redak 187) kaže samo "neka after the fact izmjene". "U bazi" je naša odluka (D6 to i jest), ali citat uz redak 74 sugerira da je izvor naručitelj. D12 (redak 174) se poziva na Q3, a Q3 ništa ne kaže o kalendaru s filtrom; to je čista odluka. (specifikacija)
+
+9. Q25 "Proizvoljno" (redak 81) spec čita kao "bez granice" (specifikacija.md:85) i nema D za to tumačenje. (specifikacija)
+
+10. D4 (nema zahtjeva prije datuma zaposlenja) ne ukida Q19/Q19.1 ("Nope" granica unatrag), ali redak 84 "bez granice unatrag" i D4 se sudaraju bez križne napomene. (specifikacija)
+
+11. Tablica polja, redak "Komentar odluke | samo kod odbijanja" (specifikacija.md:40). R5 i Q45 govore i o neobaveznom komentaru odobrenja; stupac "Obavezno" je točan, ali nema retka za opcionalni komentar odobrenja. (specifikacija)
+
+12. specifikacija.md:141: "po pravilu 80/20" stoji uz "pravila iz briefa s testovima". README redak 91 kaže "80/20 is for features, never for tests". Formulacija u specu se može pročitati kao 80/20 i za testove. (specifikacija)
+
+13. Zaglavlje spec fajla (redak 4): "Status: nacrt za potvrdu. Šalje se naručitelju na potvrdu." uz tvrdnju (redak 7) "jedini izvor istine za kod". Nema zapisa da je naručitelj potvrdio. (specifikacija)
+
+14. Odgođena tema iz atomarna-pitanja.md:155 "Prikazuje li se saldo i za sljedeću godinu? ... Tema ekrana, ovisi o 14.1" nije riješena u spec §12 ni §6. R12 traži samo tekuću godinu. (specifikacija)
+
+15. D17 (specifikacija.md:179) priznaje: "Otkazivanje tuđeg zahtjeva na čekanju kroz UI još nije napravljeno (samo API)". PRIHVAĆENO (svjesno), ali §12 i §11 to ne spominju, pa Q30/Q31 u UI-ju vrijede samo za odobrene zahtjeve. Voditelj na čekanju može odbiti (s komentarom), što je funkcionalno blizu. (specifikacija, README)
+
+16. Q-ovi bez ikakve reference u specu: Q9, Q39 (vidi nalaz 2), Q43.1, Q52. Q9, Q43.1 i Q52 ne mijenjaju ponašanje; samo Q39 je stvarni propust.
+
+## Q-ovi koji se ne slažu (sažetak zadaće 1)
+
+Q14, Q14.1, Q14.2, Q18, Q28, Q39, Q49.1, Q57 (i uz ograničenja Q25, Q30). Provjereno 77 od 77.
+
+## D-ovi (zadaća 2), citat vs Q
+
+- D1: brief (opcionalni dodaci), točno. D2: R3 doslovno ("A team lead's request goes to an admin"), Q5.1 pogrešno navedeno (nalaz 7).
+- D3: Q37 "Moze, nema bude field" je dvosmislen, D3 to sam kaže; u §11. U redu.
+- D4: nema Q, čista odluka, u redu. D5: R11 točno, Q18 vidi nalaz 1, Q15.1 "Mjeseci" točno.
+- D6: Q30.1 nalaz 8. D7: Q53.3 "?" doslovno točno. D8: Q24 "Vremenska zona servera na koji se deploya", u skladu.
+- D9: Q55 doslovno ("Ne trebaju"). D10: nalaz 3. D11: Q50 "obrada grešaka po volji" točno.
+- D12: nalaz 8. D13: Q46/Q30/Q31 su izvori za "tko", "kada" je dodatak, u redu.
+- D14: nalaz 6. D15: Q1.1 pita samo godišnji, D15 to izričito navodi, u §11 (redak 189 bilježi Q1.1). D16: Q15 točno; 7 mjeseci i 12 dana provjereno računom (lipanj do prosinac, 20x7/12=11,67, ceil 12).
+- D17: Q30, Q31, Q32 točno; PRIHVAĆENO ograničenje (nalaz 15).
+
+## R-ovi (zadaća 4)
+
+R1 (§3 retci 53-54), R2 (57), R3 (58, 55, uz Q1.1 u §11 redak 189), R4 (59), R5 (60), R6 (§4 tablica), R7 (§4 + Q23 redak 72), R8 (80), R9 (81), R10 (78-79), R11 (91), R12 (93), R13 (94), R14 (95), "within one calendar year" (83): sve odgovara briefu. Tablica vidljivosti iz briefa (zaposlenik / voditelj / admin) odgovara §7 retcima 105-117, uključujući "no type, no reason, nothing pending". Tri ekrana i poruke o greškama odgovaraju §12. "Leads one team" je u §11 redak 187. Odstupanja od briefa u §11 (6 redaka) sva imaju točan Q.
+
+## PRIHVAĆENO (svjesno izostavljeno, navedeno radi cjelovitosti)
+
+Carry-over Q14/Q14.1/Q14.2/Q18 (D5, D7, README redak 94); blagdani (D1, README 94, 222); Q28 dijeljenje preko godine (§9, README 223); Q57 bolovanje preko godišnjeg (§9, README 224); istovremeni zahtjevi (README 94, Q53.1); Q9.1 praćenje stjecanja slobodnih dana (Q9.1 "Not for now", spec redak 47); UI otkazivanje tuđeg zahtjeva na čekanju (D17).
+
+## Provjereno i u redu
+
+Svi Q-ovi iz iteracije 1 osim gore navedenih (Q1-Q13, Q15-Q17, Q19-Q24, Q26, Q27, Q29, Q31-Q38, Q40-Q48, Q50-Q56); iteracija 2 osim navedenih (Q1.1, Q5.1, Q9.1, Q15.1, Q15.2, Q19.1, Q30.1, Q31.1, Q43.1, Q49, Q53.1-Q53.8 u skladu). Sidra Q i brief.md#rules postoje. Seed (lozinka, datumi zaposlenja) u skladu s D16. README upućuje na D1-D17 i §11 ispravno osim nalaza 4.
+
+## Nisam stigao / nisam smio
+
+Nisam čitao kod, testove, sucelje.md, coding-log.md (osim potvrde da L10 postoji) ni README u cijelosti, pa ne znam ponaša li se implementacija prema nalazima 1-3 (npr. preklapanje po datumima ili radnim danima). Brojeve linija koristim samo iz fajlova koje sam otvorio. Nisam provjeravao je li naručitelj potvrdio specifikaciju (nalaz 13) niti je li rok pomaknut (nalaz 5): NEPROVJERLJIVO iz dokumenata.
+
+===== log-proces.md =====
+# Log i proces: neovisni review (zadaće 3 i 8)
+
+Commit: eb785ba (HEAD). Datum: 2026-11-01.
+Necommitane promjene (git status --short): M README.md, M docs/za-procjenu.md, M docs/zajednicko/specifikacija.md, M tester/e2e-izvjestaj.md; nepraćeno: .claude/, docs/diagrams.md, integrator_report.md, llm-shiva/, shiva_report.md.
+Nisam čitao llm-shiva/ (osim ovog fajla), shiva_report.md, integrator_report.md ni docs/za-procjenu.md. Ništa nisam pokretao osim čitajućih git naredbi i brojanja.
+
+## BLOKIRA
+
+**B1. Predaja nakon strogog roka.**
+Što: odgovor naručitelja kaže da je rok strog (29. 10. 2026.), a svi taskovi od T2 do T9 commitani su 30. 10. (00:30 do 17:21), dakle poslije roka.
+Dokaz: specifikacija.md:144 "Rok je strog: 29. listopada 2026. (Q53.6)"; atomarna-pitanja.md:196 "Je li rok od 7 dana (29. listopada) strog? | Da | Sure"; atomarna-pitanja.md:163 "Poznato: od 2026-10-22". `git log`: 91581c9 (T2) 2026-10-30 00:29:58 +0100 ... eb785ba (T9) 2026-10-30 17:21:30 +0100. Na 29. 10. postoje samo 0badbf5 i 28abb35 (21:16, razvojni dokumenti i T1).
+Napomena: reflog pokazuje da je povijest prepisana (vidi V1), pa su datumi datumi rekonstrukcije, ne nužno stvarnog rada. Ako je rad stvarno gotov do roka, to se iz repozitorija ne vidi.
+Kome: Rajko/orkestrator, README (treba iskreno objasniti).
+
+## VAŽNO
+
+**V1. Povijest je prepisana i commitana naknadno u hrpama, protivno briefu i vlastitom procesu.**
+Što: brief traži normalnu povijest, way-of-working traži commit po tasku nakon reviewa, a stvarna povijest ima parove commitova unutar sekundi i reset starih commitova.
+Dokaz: brief.md:9 "We read the commit history, so commit as you normally would."; way-of-working.md:18 "7. **Commit.** Kad reviewer kaže "nema nalaza", task se označi gotovim u taskovima i commita."; razmaci: T2 91581c9 i T3 d9d624c 4 s; T5 1467c99 i T6 8e61eb9 11 s; T8.1 0626ebb, way-of-working 78ae305 i T9 eb785ba 20 s; skeleton 8d46b3f i brief 8ed66b3 2 s. `git reflog`: "HEAD@{14}: commit: Add schema, seed and domain model (T1)", "HEAD@{13}: reset: moving to 8ed66b3", ranije "eeeae09 ... commit: Seed users and teams, add JWT login", "0ecaaaf ... commit: Reset backend to the generated skeleton".
+Kome: Rajko/orkestrator, README (How this was built to ne spominje).
+
+**V2. "Review nakon svakog taska" nije potkrijepljen logom.**
+Što: README tvrdi review nakon svakog taska, a log nema nijedan reviewerov unos za T5, T6, T8.1 i T9, niti zapis "nema nalaza" koji proces traži za commit.
+Dokaz: README.md:47 "a review after every task"; way-of-working.md:18 (gore). Reviewerovi unosi u logu: L6-L8 (T1), L15-L16 (T2), L20 (T3), L22 (T4), L30 (T7), L35-L37 (T8). Za T5 (L23, L24), T6 (L25, L26), T8.1 (L40-L42) i T9 (L38) samo developer/tester. Možda je review bio bez nalaza i nije zapisan, ali to je NEPROVJERLJIVO iz repozitorija.
+Kome: README/log (ili zapisati "nema nalaza").
+
+**V3. Odluka orkestratora L28 mijenja što korisnik vidi, nema D, a obrazloženje je u suprotnosti s L39.**
+Što: L28 odlučuje da nijedan ekran ne pokazuje saldo tuđih korisnika, iako naručitelj kaže da voditelj i admin vide salde (Q16, Q17); L39 je isti argument ("naručitelj je odgovorio da, pa korisnik to mora moći u aplikaciji") upotrijebio da obrne L33. Specifikacija nema D za to; README to navodi kao "L28:" proširenje s oznakom iz loga.
+Dokaz: coding-log.md:393 "**Odluka:** Ekran Approvals ne pokazuje saldo podnositelja. Endpoint `GET /api/users/{id}/balance` ostaje u API-ju."; coding-log.md:11 "Odluka koja mijenja ponašanje ulazi i u specifikaciju kao nova oznaka D."; coding-log.md:547 (L39) "Naručitelj je na Q30 (voditelj otkazuje tuđi zahtjev), Q31 (admin otkazuje) i Q32 (povlačenje danog odobrenja) odgovorio "da", pa korisnik to mora moći napraviti u aplikaciji."; atomarna-pitanja.md:67 "Vidi li voditelj saldo članova svog tima? ... | Da"; README.md:225 "L28: show the requester's balance on the Approvals screen".
+Kome: specifikacija (dodati D ili izričito prihvatiti kao 80/20), README (ukloniti oznaku loga, objasniti).
+
+**V4. Otkazivanje tuđeg zahtjeva NA ČEKANJU još nije u UI-ju, a README to ne spominje.**
+Što: D17 priznaje da to ne postoji u UI-ju; tražio je naručitelj (Q30, Q31); README u "Extensions (not built)" i "Deliberately out" to ne navodi.
+Dokaz: specifikacija.md:179 (D17, radna kopija) "Otkazivanje tuđeg zahtjeva na čekanju kroz UI još nije napravljeno (samo API)"; atomarna-pitanja.md:91 "Smije li voditelj otkazati tuđi zahtjev? ... | Moze"; README.md:217-225 (popis proširenja nema te stavke).
+Status odluke: D17 sam je PRIHVAĆENO (svjesno izostavljeno, dokumentirano u spec). Nalaz je samo da README to ne kaže.
+Kome: README.
+
+**V5. L14 je još "odlučeno", ali je odluka slabo provedena: `.env.example` daje valjanu javnu šifru.**
+Što: L14 je zabranio zadanu šifru jer je javna u repozitoriju; `.env.example` sadrži vrijednost od 49 znakova koja prolazi provjeru od 32 bajta (L15), pa `cp .env.example .env` bez izmjene pokreće aplikaciju s javno poznatom šifrom. Uz to je stanje loga "odlučeno" iako je T9 gotov.
+Dokaz: coding-log.md:163 "## L14 · odlučeno · T2 · pretpostavke"; coding-log.md:177 "Zadana šifra je javna u repozitoriju, pa bi svatko mogao napraviti valjani token"; `.env.example`: "JWT_SECRET=change-me-to-a-random-string-of-at-least-32-bytes"; docker-compose.yml: "JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (see .env.example)}"; README.md:102 "cp .env.example .env    # then set JWT_SECRET to a random string of at least 32 bytes".
+Kome: developer (kratka vrijednost u primjeru ili prazna), log (stanje).
+
+**V6. taskovi.md opisuje drugi proces nego way-of-working.**
+Što: taskovi.md kaže da svaka uloga ima svoj chat i da Rajko daje naredbe, tester vidi samo backend/src/test, više reviewera; way-of-working kaže da od T4 orkestrator pokreće agente, tester čita i frontend/tests, jedan reviewer.
+Dokaz: taskovi.md:3 "Svaka uloga radi u svom chatu, a Rajko im daje kratke naredbe. Tester vidi samo `docs/zajednicko/` i `backend/src/test/`"; taskovi.md:11 "Revieweri pregledaju (linija, funkcija, cjelina)."; way-of-working.md:7 "od T4 orkestrator (glavni chat s najviše konteksta) pokreće uloge kao agente."; way-of-working.md:85-86 "(backend/src/test/, frontend/tests/)"; coding-log.md:437 (L31.10) "da, tester čita i piše `frontend/tests/`".
+Kome: taskovi.md (README je usklađen s way-of-working).
+
+**V7. Commitani HEAD je nekonzistentan; popravci su samo necommitani.**
+Što: log (L39) i taskovi u HEAD-u govore o D17/T8.1, a specifikacija u HEAD-u nema D17 ni tablicu Approved requests; README u HEAD-u tvrdi 345/345 prošlo i D1-D16, iako izvješće kaže 344/1. Ispravke su u radnoj kopiji, ne u commitu.
+Dokaz: `git diff` specifikacija.md dodaje redak D17 i §12 točku 2; `git diff` README.md "-Result: 345 of 345 passed, after one wrong check in a scenario was corrected (the app was right)." / "+Result: 344 of 345 passed."; coding-log.md:11 (pravilo o D).
+Kome: Rajko (commit), specifikacija.
+
+## SITNO
+
+**S1. Stanja u logu ne slijede vlastita pravila.** L28 i L32 su "odlučeno (orkestrator)", ali provedeni (L32: sucelje.md:473 i `RequestView.java`; L28: ApprovalsScreen bez salda). L33 ima stanje "zamijenjeno s L39", koje nije među dopuštenima (coding-log.md:15 "Stanja: `otvoreno` (čeka odluku), `odlučeno` (čeka popravak), `riješeno` ..., `odbačeno` ..."). Pravilo coding-log.md:13 "Riješeni i odbačeni unosi se na kraju taska sele u `coding-log-arhiva.md`." nije provedeno: svih 42 unosa je u logu, arhive nema u docs/zajednicko/. Kome: log/orkestrator.
+
+**S2. Specifikacija nosi stare statuse i reference na log.** specifikacija.md:4 "Status: nacrt za potvrdu. Šalje se naručitelju na potvrdu." ne kaže je li potvrđena (D1-D17 donosi sam autor, potvrda naručitelja nigdje ne postoji); D10 upućuje na "(L10)", D17 na "(L39, T8.1)", iako je spec "jedini izvor istine". Kome: specifikacija.
+
+**S3. README "~530 tests" NEPROVJERLJIVO.** Brojao sam `@Test`/`@ParameterizedTest` u backend/src/test: 259; `it(`/`test(` u frontend/tests: 68; parametrizirani retci mogu to podići, ali točan broj nisam mogao potvrditi bez pokretanja. Kome: README.
+
+**S4. L32 (imena odlučitelja/otkazivača u API-ju i UI-ju) nema zasebnog D.** Pokriveno tekstom specifikacija.md:107 "uključujući komentar odluke, tko je odlučio i tko je otkazao", pa samo bilješka.
+
+## PRIHVAĆENO (svjesno izostavljeno ili zapisano kao odluka)
+
+- Zahtjev preko granice godine daje 400 (L21.1), naručitelj Q28 kaže "Dijeli; i dalje je jedan zahtjev": proširenje, specifikacija §5 i §9, README Extensions.
+- Prijenos dana, blagdani, bolovanje preko godišnjeg: D1, D5, D7, README "Deliberately out" i Extensions.
+- Istodobni zahtjevi izostavljeni: README.md:94-95 "Deliberately out: concurrent requests (about 20 users), public holidays, carry-over" (Q53.1 20-ak korisnika; u specifikaciji nema D, samo u README-u).
+- Korekcije izravno u bazi, bez ekrana: D6.
+- Popis korisnika na prijavi izbačen (pretpostavka uz Q49.1 ga je sadržavala, odgovor "Da" na lozinku): D10, L10, brief dopušta formu.
+- Greška 500 kad korisnik nestane usred poziva, naslućivanje postojanja korisničkog imena vremenom (L14.3, L14.4): prihvaćeno u L14.
+- Docker obavezan umjesto opcionalan, voditelj više timova, admin odobrava vlastiti zahtjev: specifikacija §11.
+- Pad jedne E2E provjere (344/345) iskreno naveden u README i izvješću.
+- D17: otkazivanje tuđeg zahtjeva na čekanju samo kroz API (vidi V4 za README).
+
+## Provjereno i u redu
+
+- Svi unosi "odlučeno" iz loga pregledani: L14, L28, L32, L33 (zamijenjen), L39, te orkestratorovi umetci L10, L31.10, L38 (README Data corrections postoji, README.md:191-215). L10 i L39 imaju pripadajući D u spec/README, L32 je pokriven §7.
+- L1, L2, L3, L9, L10, L11, L13: odluke ne proturječe odgovorima naručitelja (Q49, Q49.1, Q15, D6).
+- L23 točka 3 (403 za postojeći, nedopušteni zahtjev) i L27 točka 11 u skladu sa spec §8.
+- L25, L26, L40-L42: ne proturječe D3, D14, D17, Q23, Q30.1.
+- Compose zahtijeva `JWT_SECRET` bez zadane vrijednosti (osim V5), `.env` je u .gitignore.
+- README brojke: 42 unosa u logu, D1-D17, T1-T9 plus T8.1, ~75 pitanja (Q1-Q57 plus iteracija 2) odgovaraju dokumentima; 344/345 odgovara tester/e2e-izvjestaj.md.
+- README sadrži sve što brief traži (pokretanje, korisnici, pretpostavke, odluke, što dalje).
+
+## Nisam stigao provjeriti
+
+- Odgovara li stvarni kod odlukama (čitao sam dokumente; kod samo grep-om za L32/L28).
+- Sadržaj sucelje.md osim navedenih redaka, arhitektura.md, pravila-kodiranja.md, diagrams.md, e2e-scenariji, .claude/agents.
+- Je li stvarno tester vidio samo dopuštene fajlove.
+- Je li review T5, T6, T8.1, T9 održan izvan loga.
+
+===== ui-uloge.md =====
+# UI i uloge: tko što može kroz frontend
+
+Commit: eb785ba. Datum: 2026-11-01.
+Necommitane promjene (git status --short): M README.md, M docs/za-procjenu.md, M docs/zajednicko/specifikacija.md, M tester/e2e-izvjestaj.md, ?? .claude/, ?? docs/diagrams.md, ?? integrator_report.md, ?? llm-shiva/, ?? shiva_report.md.
+Čitano: brief.md, atomarna-pitanja.md, specifikacija.md, sucelje.md (retci 290-878), frontend/src (sve komponente i lib), README (odabrani dijelovi), coding-log (L28, L39-L41). Backend kod nisam čitao, pa što API vraća uzimam iz sucelja.md.
+
+## Tablica uloga i radnji
+
+Oznake: DA = moguće kroz UI i rezultat se vidi; NE = samo API; n/a = pravilo to ne dopušta.
+
+### Zaposlenik
+
+| Radnja (pravilo) | UI | Gdje / dokaz |
+| --- | --- | --- |
+| Podnijeti zahtjev, sva tri tipa (brief, Q9) | DA | MyTimeOffScreen.tsx:204-254, forma "New request" |
+| Vidjeti greške backenda (preklapanje, saldo) (brief) | DA | MyTimeOffScreen.tsx:201 ErrorAlert, :93 handleError |
+| Otkazati svoj zahtjev na čekanju (R6) | DA | MyTimeOffScreen.tsx:36-38, :125-157 |
+| Otkazati svoj odobreni zahtjev koji nije počeo (R7) | DA | isto; gumb se prikazuje i za započeti, backend vraća 409 (L27, PRIHVAĆENO) |
+| Vidjeti svoje zahtjeve sa svim detaljima (brief, Q44-Q46) | DJELOMIČNO | tip, datumi, razlog, stanje, tko je odlučio/otkazao, komentar su prikazani; razlog otkazivanja nije uvijek (V1); vremena nisu (S1) |
+| Vidjeti svoj saldo (R12) | DA | MyTimeOffScreen.tsx:40-62 (Entitlement, Used, Pending, Remaining) |
+| Kalendar: svoje na čekanju i odobrene, tuđe samo odobrene bez tipa (Q41, Q47) | DA | CalendarScreen.tsx:31-39 (bez type/status samo ime); filtriranje je u API-ju |
+| Odobravati, odbijati | n/a | link Approvals skriven (AppShell.tsx:175,184) |
+
+### Voditelj tima
+
+| Radnja (pravilo) | UI | Gdje / dokaz |
+| --- | --- | --- |
+| Sve što zaposlenik (Q3: voditelj je i zaposlenik) | DA | iste rute, AppShell.tsx:181-191 |
+| Odobriti/odbiti zahtjev člana tima (R1) | DA | ApprovalsScreen.tsx:380-393 |
+| Odbijanje traži komentar (R5) | DA | UI ne provjerava, backend 400 se prikaže (ApprovalsScreen.tsx:327) |
+| Vlastiti zahtjev ide adminu, ne odlučuje ga (R3, D2) | DA | popis `GET /api/approvals` ga ne sadrži (sucelje.md:373) |
+| Otkazati tuđi odobreni zahtjev koji nije počeo, s razlogom (Q30, Q32, D3, D17) | DA | ApprovalsScreen.tsx:404-457, tablica "Approved requests" |
+| Otkazati tuđi zahtjev NA ČEKANJU (Q30, D14, spec odjeljak 4) | NE | PRIHVAĆENO, D17: "Otkazivanje tuđeg zahtjeva na čekanju kroz UI još nije napravljeno (samo API)" |
+| Vidjeti sve zahtjeve članova, sva stanja, s tipom i razlogom (brief, spec odjeljak 7) | NE / DJELOMIČNO | vidi V2 |
+| Vidjeti saldo članova (Q16) | NE | PRIHVAĆENO: L28 i README "Extensions" |
+| Kalendar svog tima s tipom i stanjem, filtar po timu (Q42, D12) | DA | CalendarScreen.tsx:114-128 (filtar), :36-38 (tip i stanje); koga vidi odlučuje API |
+| Vlastiti zahtjev: podnijeti, otkazati, saldo | DA | isto kao zaposlenik |
+
+### Admin
+
+| Radnja (pravilo) | UI | Gdje / dokaz |
+| --- | --- | --- |
+| Sve što zaposlenik (Q1: admin je zaposlenik) | DA | iste rute |
+| Odobriti/odbiti bilo koji zahtjev (R2) | DA | ApprovalsScreen.tsx, popis iz `GET /api/approvals` |
+| Odobriti vlastiti zahtjev (Q1.1, D15) | DA | sucelje.md:373 "Eva vidi sve na čekanju, i svoje"; UI ništa ne filtrira |
+| Odbiti vlastiti zahtjev | NEPROVJERLJIV | sucelje.md:316 red 1 kaže da admin smije "bilo koji zahtjev, i vlastiti"; spec redak 58 dopušta iznimku samo za odobravanje (Q1.1), R3 inače zabranjuje odbijanje vlastitog. Backend nisam čitao, a UI gumb Reject postoji u svakom retku |
+| Otkazati tuđi odobreni, nije počeo, s razlogom (Q31, Q32) | DA | tablica "Approved requests" |
+| Otkazati tuđi na čekanju (Q31) | NE | PRIHVAĆENO, D17 |
+| Vidjeti sve zahtjeve u tvrtki (brief, Q17) | NE / DJELOMIČNO | vidi V2 |
+| Vidjeti saldo svih (Q17) | NE | PRIHVAĆENO: L28, README |
+| Kalendar svih timova s filtrom, uključujući korisnike bez tima (Q43) | DA | CalendarScreen.tsx:121 "All teams" kao zadano, :122-126 timovi iz `GET /api/teams` |
+| Ispravak datuma zaposlenja, već započetog zahtjeva | NE | PRIHVAĆENO, D6 (SQL, README) |
+| Zahtjev zaposlenika bez tima odobrava admin (Q4) | DA | popis admina sadrži sve na čekanju (sucelje.md:373) |
+
+Usporedba sa specifikacijom odjeljak 12 i sucelje.md: tri ekrana i tablica "Approved requests" (D17) odgovaraju kodu. Rute, nazivi stupaca, tekstovi praznih stanja i oznake iz sucelje.md (retci 580-736 i 843-864) slažu se s kodom koji sam pročitao.
+
+## BLOKIRA
+
+Nema nalaza.
+
+## VAŽNO
+
+**V1. Vlasnik ne vidi razlog otkazivanja ako zahtjev ima komentar odluke.**
+Što: stupac Comment prikazuje `decisionComment`, a `cancelReason` samo kad komentara odluke nema. Zahtjev koji je Ana odobrila s "ok", a Eva otkazala s razlogom (razlog je obavezan, D3), vlasniku pokazuje samo "ok". Specifikacija odjeljak 7 i brief traže da zaposlenik vidi svoje zahtjeve "sa svim detaljima".
+Dokaz: frontend/src/components/MyTimeOffScreen.tsx:33: `return request.decisionComment ?? request.cancelReason ?? "";`. Sucelje.md:680: "`decisionComment`, inače `cancelReason`, inače prazno". Spec redak 107: "Svoje zahtjeve sa svim detaljima, uključujući komentar odluke, tko je odlučio i tko je otkazao".
+Kome: specifikacija/sučelje (orkestrator odlučuje je li namjerno), zatim developer.
+
+**V2. Voditelj i admin kroz UI ne mogu vidjeti zahtjeve koje spec odjeljak 7 kaže da vide (sva stanja, razlog).**
+Što: pregled "svi zahtjevi, sva stanja, tip i razlog" postoji samo kao `GET /api/requests`. Approvals pokazuje samo zahtjeve na čekanju i odobrene koji nisu počeli (bez razloga). Odbijeni, otkazani i već započeti odobreni zahtjevi članova nigdje u UI-ju nisu vidljivi; kalendar pokazuje samo PENDING i APPROVED, bez razloga. Specifikacija odjeljak 12 ne navodi ekran za to, a README to ne navodi kao ograničenje ni proširenje (grep README: ne nalazi; `GET /api/requests` je samo u tablici API-ja, README.md:162).
+Dokaz: sucelje.md:459: "nema; API za pravila vidljivosti". Spec redak 108: "Sve zahtjeve članova timova koje vodi, u svim stanjima, s tipom i razlogom". Brief retci 100-103 (Team lead: "Every request from their team, including type, reason and pending requests").
+Kome: specifikacija (ili izričita odluka D) i README.
+
+## SITNO
+
+**S1. Vremena (stvaranje, odluka, otkazivanje) se ne prikazuju nigdje.**
+Dokaz: spec redak 44 "Vrijeme stvaranja, vrijeme odluke ili otkazivanja | da" i D13; frontend/src/lib/types.ts ima `createdAt`, `decidedAt`, `cancelledAt`, ali MyTimeOffScreen.tsx:169-190 ih ne prikazuje. Kome: specifikacija (reći je li prikaz potreban) ili developer.
+
+**S2. Tekući mjesec kalendara računa se u vremenu preglednika, ne servera (Europe/Zagreb).**
+Dokaz: frontend/src/lib/month.ts:63-67 `new Date()`, `getFullYear()`, `getMonth()`; spec D8 i Q24 govore o vremenskoj zoni servera. Sucelje.md:720 to izričito propisuje ("u lokalnom vremenu preglednika"). Kome: specifikacija/sučelje.
+
+**S3. Ruta /approvals nije zatvorena za zaposlenike, skriven je samo link.**
+Spec redak 199 "samo za voditelje i admine"; sucelje.md:589 opisuje da ručno otvorena ruta pokazuje praznu listu. Podaci nisu otkriveni (API vraća prazno), pa je u skladu sa spec 7. PRIHVAĆENO u sučelju, navedeno radi potpunosti. Kome: nikome.
+
+**S4. Sučelje T8 (Approvals) je zastarjelo u odnosu na T8.1.**
+Dokaz: sucelje.md:700 "Pri otvaranju zove `getApprovals()`", :715 "Uspjeh: ponovo `getApprovals()`"; kod ApprovalsScreen.tsx:287 zove oba popisa. Sucelje.md:845 i :863 ispravljaju to, ali T8 odjeljak nije izmijenjen. Kome: log/orkestrator (sučelje).
+
+**S5. README ne spominje da otkazivanje tuđeg zahtjeva na čekanju nije u UI-ju (D17), a "Extensions" navodi L28 s internom oznakom.**
+Dokaz: README.md:225 "L28: show the requester's balance on the Approvals screen ..."; D17 (spec redak 179) jedini je zapis o rupi; grep README nije našao to ograničenje. Kome: README.
+
+## PRIHVAĆENO (svjesno izostavljeno ili odlučeno)
+
+- P1. Saldo drugih (Q16, Q17) nije u UI-ju: L28 (coding-log:389-396) i README.md:225. API postoji (`GET /api/users/{id}/balance`). Q16 i Q17 su odgovori naručitelja, ali ne spominju ekran.
+- P2. Otkazivanje tuđeg zahtjeva na čekanju samo kroz API: spec D17 (redak 179). Odbijanje s komentarom pokriva isti cilj, ali daje stanje Rejected, ne Cancelled.
+- P3. Gumb Cancel je prikazan i za započete odobrene zahtjeve, backend vraća 409: sucelje.md:696 (L27).
+- P4. Login je forma bez popisa korisnika: D10; pretpostavka uz Q49.1 o popisu je nadjačana.
+- P5. Prijenos dana, blagdani, zahtjev preko granice godine: README.md:94-95 i spec odjeljak 9. U UI-ju nema traga, što je dosljedno.
+
+## Provjereno i u redu
+
+- Navigacija: Approvals link samo za `teamLead || admin` (AppShell.tsx:175), nazivi odgovaraju sucelju.md:636-642.
+- Forma, saldo i tablica My requests slijede sucelje.md:644-696 (stupci, tekst statusa "Approved by X", "Cancelled by X").
+- Approvals: stupci i gumbi odgovaraju sucelju.md:702-716 i 847-864; oba popisa se ponovo učitavaju nakon approve/reject/cancel (ApprovalsScreen.tsx:336-338).
+- Frontend ne provjerava komentar niti razlog (R5, D3), prikazuje `detail` backenda (api.ts:49-58, ErrorAlert.tsx).
+- 401 vodi na /login bez poruke (useApiError.ts:14-17).
+- Kalendar: grupiranje po danima, vikendi se ne prikazuju (month.ts:76-84), FULL/LIMITED unosi (CalendarScreen.tsx:31-39), filtar "All teams" kao zadano (D12, Q43).
+- Svi tekstovi u UI-ju na engleskom (Q54).
+
+## Nisam stigao / nisam mogao provjeriti
+
+- Backend kod i testovi: ne znam stvarno ponašanje API-ja (vidljivost kalendara za voditelja u tuđem timu, može li admin odbiti vlastiti zahtjev); oslonio sam se na sucelje.md.
+- Radi li UI stvarno (nisam pokretao aplikaciju, po zadatku).
+- Frontend testovi (frontend/tests) nisu čitani.
+- Dijelovi sucelja.md retci 1-289 (T1-T4) i README izvan navedenih redaka.
+
+===== readme-konfig.md =====
+# Review: pokretanje, konfiguracija, README
+
+- Commit: eb785ba
+- Datum: 2026-11-01
+- Necommitano (git status --short): ` M README.md`, ` M docs/za-procjenu.md`, ` M docs/zajednicko/specifikacija.md`, ` M tester/e2e-izvjestaj.md`, `?? .claude/`, `?? docs/diagrams.md`, `?? integrator_report.md`, `?? llm-shiva/`, `?? shiva_report.md`.
+- README.md koji sam čitao je necommitana verzija (radno stablo), ne ona iz eb785ba.
+
+## BLOKIRA
+
+Nema nalaza koji krše brief, odgovor naručitelja ili specifikaciju, niti onih koji sigurno ruše aplikaciju.
+
+## VAŽNO
+
+1. **Primjer iz `.env.example` prolazi provjeru ključa, pa kopiranje bez izmjene daje javno poznat JWT secret.**
+   - Dokaz: `.env.example:3`: `JWT_SECRET=change-me-to-a-random-string-of-at-least-32-bytes`. Taj tekst ima 49 znakova (ASCII), a `SecurityConfig.java` odbija samo ključ kraći od `MIN_KEY_BYTES = 32`. `docker-compose.yml:29`: `JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (see .env.example)}` odbija samo prazno/nepostavljeno.
+   - Zašto: cilj L14 je da nitko ne može sam izraditi valjani token. Korisnik koji samo napravi `cp .env.example .env` (README.md:102) pokrene stack s tajnom koja je javno u repozitoriju. README to prepušta riječima "then set JWT_SECRET".
+   - Pripada: developer/orkestrator (prazna vrijednost `JWT_SECRET=` u `.env.example` bi natjerala Compose da stane s postojećom porukom); README kao zaobilazno rješenje.
+
+2. **Backend image pokrenut bez Composea koristi javni zadani secret, što L14 zabranjuje; komentar u properties je netočan.**
+   - Dokaz: `backend/src/main/resources/application.properties:12-13`: `# Local and test default only; Docker sets JWT_SECRET.` / `app.jwt.secret=${JWT_SECRET:local-dev-secret-change-me-0123456789}`. JWT_SECRET postavlja samo Compose (`docker-compose.yml:29`); `backend/Dockerfile` ga ne traži.
+   - Zašto: `docker build ./backend` pa `docker run` (uz bazu preko `SPRING_DATASOURCE_URL`) starta s poznatom tajnom, bez upozorenja. L14 u logu govori samo o Composeu.
+   - Pripada: developer (komentar, ili bez zadane vrijednosti izvan testova); README treba reći da je podržan samo Compose.
+
+3. **`backend/mvnw` je u git indeksu bez izvršnog bita, pa README naredba `./mvnw test` ne radi na svježem checkoutu na Linuxu/macOS-u.**
+   - Dokaz: `git ls-files -s backend/mvnw`: `100644 bd8896bf2217b46faa0291585e01ac1a3441a958 0	backend/mvnw`. README.md:116: `(cd backend && ./mvnw test)`.
+   - Zašto: "Permission denied" je prvi dojam recenzenta. Nisam pokretao; zaključak iz moda u indeksu.
+   - Pripada: README (`sh mvnw test`) ili developer (`git update-index --chmod=+x backend/mvnw`).
+
+4. **README linka na `docs/diagrams.md`, koji nije u gitu.**
+   - Dokaz: README.md:152: `[diagrams.md](docs/diagrams.md)`; `git ls-files --error-unmatch docs/diagrams.md` ne nalazi fajl; `git status`: `?? docs/diagrams.md`. Fajl postoji na disku. Isto `specifikacija.md` sekcija 13: `[diagrams.md](../diagrams.md)` (necommitana izmjena).
+   - Zašto: u commitu eb785ba link ne vodi nikamo; README, specifikacija i diagrams.md moraju u isti commit.
+   - Pripada: log/orkestrator.
+
+5. **README navodi model "Haiku" za E2E, a u commitanim dokumentima to nigdje ne piše.**
+   - Dokaz: README.md:51: `This first run was done by an LLM (Haiku);`. `grep -rn Haiku docs tester README.md` pogađa samo README (osim fajla koji nisam smio čitati). `tester/e2e-izvjestaj.md` ne imenuje model.
+   - NEPROVJERLJIVO iz dopuštenih izvora.
+   - Pripada: tester (upisati model u e2e-izvjestaj.md).
+
+6. **Brojka "~530 tests" nije provjerljiva bez pokretanja.**
+   - Dokaz: statički brojim 219 `@Test` + 40 `@ParameterizedTest` (backend) i 64 `it(` + 4 `it.each(` (frontend); 327 deklaracija. Konačna brojka ovisi o širenju parametriziranih testova. README.md:46 i :85 `~530`.
+   - NEPROVJERLJIVO. Pripada: README/tester (brojka iz stvarnog izlaza).
+
+## SITNO
+
+1. Nesuglasna imena varijabli: Compose postavlja `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` (`docker-compose.yml:25-27`), a `application.properties:3-5` definira `DB_URL`, `DB_USER`, `DB_PASSWORD`. Radi (Spring čita oba), ali `DB_*` nitko ne koristi i nisu dokumentirani. Pripada: developer/README.
+2. Zona (D8) se postavlja samo u Composeu (`docker-compose.yml:8,30,42`: `TZ: Europe/Zagreb`); `ClockConfig.java` koristi `Clock.systemDefaultZone()`. Samostalan backend image računa "danas" u UTC-u. Isti uzrok kao VAŽNO 2. Pripada: README.
+3. Baza je objavljena na hostu s trivijalnom lozinkom: `docker-compose.yml:9-10` `POSTGRES_PASSWORD: timeoff`, `ports: - "5432:5432"`. Nije potrebno za README (koristi `docker compose exec`) i sudara se s lokalnim Postgresom. Pripada: developer.
+4. Nema healthchecka za backend; `/actuator/health` je izložen (`application.properties:10`) i otvoren (`SecurityConfig.java`: `.requestMatchers("/actuator/health", "/error").permitAll()`), ali nije u README tablici API-ja. `frontend` ima `depends_on: - backend` bez uvjeta. Pripada: developer/README.
+5. README traži samo "Needs Docker" (redak 99), a Test blok traži i JDK 21 i Node (verzija nigdje u README-u; Dockerfile koristi `node:22-alpine`; nema `engines` u `frontend/package.json`). Pripada: README.
+6. README.md:231 "End-to-end tests against the running Compose stack" djelomično proturječi retcima 46-52 (E2E putovi već odrađeni); stvarni sljedeći korak je skripta (Playwright). Pripada: README.
+7. "~75 atomic questions" (README.md:12): `atomarna-pitanja.md` ima 77 sidara `id="q..."`, od toga 57 glavnih; "~75" vrijedi samo ako se broje podpitanja. Pripada: README.
+
+## PRIHVAĆENO (svjesno izostavljeno)
+
+- Carry-over, hrvatski blagdani, istovremeni zahtjevi, godišnja granica, preklapanje bolovanja: README "Deliberately out" i "Extensions (not built)", D5, D7. README sada izričito navodi da je D5 odstupanje od odgovora Q18 (i Q14.1, "do 30. lipnja"); odgovor naručitelja time nije ispunjen, ali je evidentirano.
+- L28: nema salda podnositelja na Approvals ekranu (log L28, README Extensions).
+- D17: otkazivanje tuđeg zahtjeva na čekanju kroz UI nije napravljeno, samo API (specifikacija D17).
+- E2E: 344/345, jedna ispravljena stavka nije ponovo izvršena; README to iskreno kaže (podudara se s `tester/e2e-izvjestaj.md`).
+
+## Provjereno i u redu
+
+- Svih 13 ruta iz README tablice postoji u controllerima (login, me, me/balance, POST requests, approve/reject/cancel, approvals, approvals/cancellable, me/requests, requests, requests/{id}, users/{id}/balance, calendar s `month` obveznim i `teamId` neobveznim, teams). Nema ruta u controllerima koje README ne navodi osim `/actuator/health`.
+- Svi README linkovi osim `docs/diagrams.md` su pod `git ls-files`: specifikacija, arhitektura, taskovi, pravila-kodiranja, coding-log, sucelje, way-of-working, TESTING_METHODOLOGY, e2e-scenariji, e2e-izvjestaj.
+- D1–D17: točno 17 odluka u specifikaciji sekciji 10; sekcije 9 (proširenja) i 11 (odstupanja) postoje.
+- Coding log: 43 naslova `## L`, jedan je predložak `Lx`, dakle 42 unosa kako README kaže. L9, L14, L28, L34 postoje i odgovaraju kontekstu.
+- E2E: 83+28+42+76+115 = 344 PROSLO + 1 PALO = 345, 5 lanaca; podudara se s README-om.
+- Seed (V2__seed.sql): 8 korisnika, uloge i timovi odgovaraju README tablici; Tom 2026-06-01, ostali 2020-01-01; eva admin bez tima; jedna lozinka (BCrypt); nema zahtjeva (D9).
+- SQL u "Data corrections": sve tablice i stupci postoje u V1__schema.sql; 'CANCELLED' dopušten CHECK-om.
+- Run blok redom: `cp .env.example .env` pa `docker compose up -d --build`; `.env` je u `.gitignore` i nije praćen (`git check-ignore -v`); Compose bez JWT_SECRET staje (`:?`). BOM na početku `.gitignore` ne kvari pravilo (`git check-ignore -v` pogađa `docs/old/`).
+- Backend Dockerfile: dvofazni, `target/*.jar` pogađa jedan jar. Frontend Dockerfile: `API_URL` kao ARG i ENV u obje faze. Portovi 8080/3000 odgovaraju README-u.
+- Testcontainers koristi `postgres:17`, kao Compose; Java 21 u `backend/pom.xml:30`.
+- Nijedna prava tajna nije u repozitoriju osim razvojne zadane vrijednosti (VAŽNO 2) i DB lozinke `timeoff`.
+
+## Nisam stigao / ne smijem
+
+- Nisam pokrenuo testove, Docker ni aplikaciju: ne mogu potvrditi ~530 testova, da `docker compose up` prolazi ni da `next start` s `npm ci --omit=dev` učitava `next.config.ts` bez paketa `typescript`.
+- Frontend izvorni kod nisam čitao osim `next.config.ts` i `package.json`.
+- Sadržaj `diagrams.md` nisam uspoređivao s README tvrdnjom o dijagramima.
+- Arhitekturu, way-of-working i taskove nisam provjeravao tvrdnju po tvrdnju, samo reference iz README-a.
+

@@ -1,0 +1,77 @@
+haiku 5.5 medium 
+
+Shiva2
+
+Ti si potpuno neovisni, okrutni reviewer projekta u C:\Projects\time-off-tracker. Nisi sudjelovao u izradi i nikome ne duguješ ništa. Cilj: naći svaku nekonzistentnost, a ne potvrditi da je sve u redu. Budi okrutan, ali točan: svaki nalaz mora imati dokaz (fajl:redak ili citat).
+
+Izvori istine, redom prednosti:
+1. docs/zajednicko/brief.md (zadatak naručitelja)
+2. docs/zajednicko/atomarna-pitanja.md (odgovori naručitelja, oznake Q)
+3. docs/zajednicko/specifikacija.md (pravila R, odgovori Q, odluke D)
+
+Provjeri konzistentnost između:
+- brief + odgovori naručitelja (Q) ↔ specifikacija: je li ijedna odluka D ili pravilo u suprotnosti s odgovorom naručitelja, ili ga tiho ignorira?
+- specifikacija ↔ docs/zajednicko/coding-log.md: posebno unosi koje je odlučio "orkestrator" — jesu li u skladu s odgovorima naručitelja? Je li ijedna odluka iz loga promijenila ponašanje, a nije ušla u specifikaciju kao D?
+- specifikacija + docs/zajednicko/sucelje.md ↔ kod (backend/src/main, frontend/src): radi li kod ono što pravila kažu? Ima li pravila bez koda ili koda bez pravila?
+- specifikacija 12 (ekrani) ↔ frontend: može li korisnik kroz UI napraviti sve što mu pravila dopuštaju?
+- README.md ↔ stvarno stanje (brojke, linkovi, tvrdnje, endpointi).
+- docs/arhitektura.md i docs/pravila-kodiranja.md ↔ kod (slojevi, tablice odluka umjesto razbacanih ifova).
+
+Samo čitaš. Ništa ne mijenjaš, ništa ne upisuješ u log, ne commitaš.
+
+Vrati izvještaj:
+- nalazi sortirani po težini: BLOKIRA (krši odgovor naručitelja ili specifikaciju, ili ruši aplikaciju), VAŽNO (nekonzistentnost dokumenata ili arhitekture), SITNO;
+- za svaki: jedna rečenica što, dokaz, i kome pripada (specifikacija, log/orkestrator, developer, tester, README);
+- na kraju: što si provjerio a bilo je u redu, i što nisi stigao provjeriti.
+
+- i sve ostalo što primijetiš: svaka dva dokumenta, ili dokument i kod, koji tvrde različito.
+
+
+Izvještaj: nekonzistentnosti u time-off-tracker
+
+Ništa nisam mijenjao, nisam ništa upisao u log i nisam commitao. Specifikacija sama kaže da je “nacrt za potvrdu” (specifikacija.md:4), a kod i README je tretiraju kao gotovu. Zato su mnogi nalazi pitanja za naručitelja, a ne samo popravci u kodu.
+
+Oznake: R = pravilo iz briefa, Q = odgovor naručitelja, D = naša odluka.
+
+BLOKIRA
+Login ekran nema popis korisnika, a naručitelj je prihvatio popis. Q49.1 ima pretpostavku “popis korisnika za brzi odabir” i odgovor “Da” (atomarna-pitanja.md:190). D10 to ukida (specifikacija.md:172), a L10 to potvrđuje, pri čemu formulira pitanje kao da odgovora nema (coding-log.md:110–118). Kod: LoginScreen.tsx je samo forma. Kome: specifikacija i orkestrator; naručitelj treba potvrditi.
+Razlog za tuđe otkazivanje je obavezan, a odgovor naručitelja kaže suprotno. D3 tvrdi da Q37 glasi “Može, neka bude polje” (specifikacija.md:165). Stvarni odgovor je “Moze, nema bude field” (atomarna-pitanja.md:98), dakle bez polja za razlog. Kod to provodi: CancelService.java:83. Ako ostane, mora biti označeno kao odluka protiv odgovora i poslano naručitelju. Kome: specifikacija.
+Prijenos dana: naručitelj je rekao da, specifikacija kaže ne. Q14 “Da, kao u Hrvatskoj” (atomarna-pitanja.md:65), Q14.1 do 30. lipnja (:182), Q14.2 bez gornje granice (:183). Specifikacija ih svrstava u proširenja (specifikacija.md:154) pozivom na D7. D7 se poziva na Q53.3, koji je odgovor “?” (atomarna-pitanja.md:193). “?” nije “ne”, pa D7 ne pokriva ovo. Kome: specifikacija (D5, D7).
+Preklapanje se računa kalendarski, a naša odluka Q39 kaže po radnim danima. Q39: “Naša odluka: preklapanje se računa samo po radnim danima” (atomarna-pitanja.md:105). Kod: TimeOffRequest.java:85 uzima sve datume. Primjer: postojeći zahtjev 6.–8. 11. 2026. (pet–ned, jedan radni dan) i novi 7.–9. 11. (sub–pon, jedan radni dan). Po Q39 prolazi jer se radni dani ne preklapaju, a kod vraća 409. Specifikacija Q39 ne spominje (specifikacija.md:81); samo za-procjenu.md:44 priznaje da kod broji kalendarske dane. Kome: specifikacija (propust) i developer (kod).
+Komentar odobrenja: specifikacija kaže da ga nema, brief kaže da je dopušten. Tablica kaže “Komentar odluke: samo kod odbijanja” (specifikacija.md:40). R5 kaže “An approval comment is optional” (brief.md:73). Q45 pretpostavlja komentar odobrenja (atomarna-pitanja.md:116). Kod ga sprema, a UI ga šalje (ApprovalsScreen.tsx). Kome: specifikacija.
+VAŽNO
+Q28 i Q57 su naručiteljevi odgovori, ali nisu u popisu odstupanja. Q28 “Dijeli” (atomarna-pitanja.md:84) i Q57 “mozes otic na bolovanje kad si na GO” (:145) su u proširenjima (specifikacija.md:156–157). Odjeljak 11 (:185–192) ih ne navodi. Brief dopušta pretpostavku jedne godine (brief.md:93), pa je Q28 tu legitimna, ali se mora navesti. Kome: specifikacija.
+Tuđe zahtjeve na čekanju pravilo dopušta, a ekran ne. Otkazivanje na čekanju je dopušteno (specifikacija.md:70), Q30 i Q31 potvrđuju (atomarna-pitanja.md:91–92). Approvals ima samo tablicu “Approved requests” (ApprovalsScreen.tsx:154). Odjeljak 12 to ne navodi (specifikacija.md:199). D17 to priznaje (:179), ali odjeljak 12 je napisan kao potpun. Kome: specifikacija (odjeljak 12) i developer (T8.1).
+Saldo članova i svih korisnika (Q16, Q17) nigdje nije u UI-ju. Q16 traži saldo članova tima za voditelja (atomarna-pitanja.md:67), Q17 saldo svih za admina (:68). API to ima (VisibilityController.java), ali frontend zove samo getMyBalance (api.ts:103). L28 izbacuje saldo s Approvals kao “proširenje za README” (coding-log.md:389–395), bez D oznake, a odjeljak 9 ga ne navodi. Kome: specifikacija (odjeljak 12) i orkestrator (L28 bez D).
+“Pokretanje jednom naredbom” nije istina, a zadana šifra prolazi provjeru. Specifikacija kaže “pokretanje jednom naredbom” (specifikacija.md:133). README traži cp .env.example .env i ručnu izmjenu JWT_SECRET (README.md:101–103). Placeholder u .env.example:3 ima više od 32 bajta, pa prođe provjeru duljine ako ga nitko ne promijeni. L14 mijenja ponašanje, a nema D oznake (coding-log.md:176). Kome: specifikacija i orkestrator; README.
+Javni zadani JWT ključ je u repozitoriju. application.properties:13 sadrži local-dev-secret-change-me-0123456789. Ako se image pokrene s docker run bez JWT_SECRET, koristi se taj javni ključ. README tvrdi “there is no default” (README.md:109), što vrijedi samo za Compose. Kome: developer ili README (preciznije).
+docs/diagrams.md nije u gitu, a linkovi na njega postoje. git status pokazuje ?? docs/diagrams.md, a git ls-files ga ne vraća. README ga linka (README.md:152), kao i specifikacija (specifikacija.md:206). U commitu linkovi pucaju. Kome: README i specifikacija (commit).
+“~530 testova” ne mogu potvrditi. README tako kaže (README.md:46). Izbrojao sam 219 @Test u backendu, 68 it/test u frontendu i 40 @ParameterizedTest metoda. Broj slučajeva iz parametriziranih nisam zbrojio. Kome: README.
+Testovi nisu po metodologiji, a README to samo priznaje. README kaže “so far only partly” (README.md:28), a way-of-working traži cilj 99:1 (way-of-working.md:14). Kome: tester.
+Process dokumenti se ne slažu s logom o tome što tester vidi. taskovi.md:3 i way-of-working.md:8 kažu da tester vidi samo docs/zajednicko/ i backend/src/test/. Log pokazuje da tester čita i piše frontend/tests/ (coding-log.md:436–437, :506). Kome: way-of-working i taskovi.
+SITNO
+Log pravilo kaže da se riješeni unosi sele u coding-log-arhiva.md (coding-log.md:13), a datoteka ne postoji, iako su svi taskovi “gotovo” (taskovi.md:17–27). Kome: orkestrator.
+Arhitektura u sloju 6 kaže da se pri odobravanju zove requestRepository.save(request) (arhitektura.md). ApprovalService i CancelService ne zovu save, samo RequestService.java:65. Radi zbog @Transactional, ali dokument ne odgovara kodu. Kome: arhitektura.
+Pravilo “jedno mjesto za svako pravilo” je prekršeno za “danas”: tekuću godinu računaju i BalanceController.java (API sloj, što arhitektura zabranjuje) i VisibilityService.java. Kome: developer.
+Pravilo “tablice umjesto if-else” (pravila-kodiranja.md:14) nije u potpunosti poštovano u CalendarService.toEntry, gdje je if-lanac nad Access. Kome: developer.
+frontend/README.md je još predložak create-next-app. Kome: README.
+Dvije odluke mijenjaju ponašanje, a nisu u specifikaciji kao D: token nosi samo identitet (L9, coding-log.md:106) i 60 s tolerancije na istek tokena (L12, točka 6, :139). Kome: orkestrator.
+Specifikacija je nacrt koji čeka potvrdu naručitelja (specifikacija.md:4), a README i kod je tretiraju kao gotovu. Kome: specifikacija i README.
+Što je u redu (provjereno)
+Ovlasti: ApprovalPolicy.java pokriva R1, R2, R3, D2, D15 i Q4, usklađeno s odjeljkom 3.
+Otkazivanje: CancelPolicy.java i CancelService.java pokrivaju R6, R7, D14, Q23, Q30.1 i Q31.1. Redoslijed 403, pa 400, pa 409 odgovara sučelju.
+Stanja: Status.java odgovara R4 i arhitekturi 5.4.
+Datumi i saldo: R8 (servis i CHECK u V1__schema.sql), R10 (WorkingDays.java), R11, R13, R14, D4, D5 i Q15/Q15.2 (20 × mjeseci / 12, zaokruženo gore; Tom = 12 dana).
+Vidljivost: VisibilityPolicy.java ima tri razine. Kalendar pokazuje kolegama samo odobrene, ime i datume. Odbijeni i otkazani se nikome ne prikazuju. Popisi vraćaju praznu listu, a ne 403.
+Seed (V2__seed.sql): korisnici, timovi, voditelj je član svog tima, Tom 2026-06-01, Eva admin bez tima, bez zahtjeva.
+Statusi grešaka: ApiExceptionHandler.java i ProblemAuthenticationEntryPoint.java.
+Sučelje: popis endpointa i redoslijed sortiranja poklapaju se s kontrolerima. Poruke grešaka provjerio uzorkom.
+Arhitektura 2.3 je ispravljena (L9): token nosi id i username, a kod tako radi.
+README: 42 unosa u logu, D1–D17, tablica endpointa, Java 21, Tailwind, Vitest i RTL, tablica korisnika. E2E je 344 od 345 i 5 lanaca (e2e-izvjestaj.md:14, :18).
+Što nisam stigao provjeriti
+Cijelo sučelje (878 redaka). Provjerio sam endpoint popis, sortiranja i uzorak poruka.
+Sadržaj testova. Samo sam ih brojao, pa nisam potvrdio jesu li Q39, D3 i D10 pokriveni testovima.
+Nisam pokrenuo testove ni aplikaciju.
+Pravila stila nisam provjerio u svim datotekama, samo uzorkom.
+Nisam čitao tester/TESTING_METHODOLOGY.md, docs/za-procjenu.md, docs/lessons.md, cijeli docs/way-of-working.md, sadržaj e2e-scenariji.md, api.ts (osim dijela), session.ts, types.ts, UserView, LoginResult i repozitorije.
+Broj “~530 testova” ne mogu potvrditi jer ne znam broj slučajeva u parametriziranim testovima.

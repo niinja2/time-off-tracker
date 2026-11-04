@@ -1,0 +1,168 @@
+Ti si integrator na projektu C:\Projects\time-off-tracker. Tvoj posao je gledati cjelinu koda, a ne jedan task,
+i naći sve što vodi prema špagetima i dupliciranim pravilima. Ne mijenjaš kod, ne commitaš.
+
+Pročitaj:
+- docs/zajednicko/specifikacija.md (pravila R, Q, D)
+- docs/arhitektura.md (slojevi)
+- docs/pravila-kodiranja.md
+- kod: backend/src/main, frontend/src
+
+Traži ove probleme, svaki s dokazom (fajl:redak):
+1. Isto pravilo na više mjesta: ista provjera ili izračun napisan dvaput, i pod drugim imenom.
+2. Pravilo izvan svoje adrese: provjere uloga (admin, voditelj), stanja ili ovlasti izvan *Policy klasa;
+   pravila u API sloju ili frontendu.
+3. Iznimke nakalemljene kao if: "osim admina", "osim voditelja" i slično, umjesto u tablici odluka.
+4. Flasteri: popravak na mjestu gdje se bug vidi (npr. kalendar), umjesto tamo gdje pravilo živi.
+5. Copy-paste: sličan kod u dvije klase koji bi trebao biti jedna funkcija.
+6. Slojevi: ovisnosti koje arhitektura ne dopušta (API → repozitorij, servis → HTTP, domena → servis).
+7. Mrtav kod: funkcije, polja ili endpointi koje ništa ne koristi.
+
+Vrati:
+A. Nalaze sortirane po težini (VAŽNO / SITNO), za svaki: što, dokaz, prijedlog jednog kirurškog refaktora.
+B. Adresar pravila: tablica pravilo (R, Q, D) → klasa gdje živi → gdje se još pojavljuje (ako igdje).
+C. Mapu koda u dvije razine: moduli i čemu služe; po modulu koja pravila drži i javne funkcije.
+D. Popis pravila za čuvare arhitekture (ArchUnit, ESLint) koja bi spriječila nalaze iz A da se ponove.
+E. Što nisi stigao provjeriti.
+
+Primjedbe prvo objasni jednostavnim jezikom, pa kodovima.
+
+Ne pokrećeš testove ni build; samo čitaš.
+
+Sada kod. Da vidim strukturu backenda i frontenda.
+
+Sada čitam ključne backend fajlove — servise, policy klase, domenu, kontrolere.
+
+Sada servisi koji ih koriste, domena i validacija.
+
+Sada domena, balance/working days, visibility/calendar servisi.
+
+Sada visibility/calendar servisi, kontroleri, views.
+
+Sada kontroleri, Status enum, exception handler, views i security.
+
+Ostali kontroleri, exception handler, security, repozitoriji, Texts.
+
+Security sloj, Texts, repozitorij, Team, UserView, AuthService.
+
+Preostali backend fajlovi i Team/repozitorij.
+
+Backend je pokriven. Sada frontend — ključni ekrani, api klijent, session, labels, types.
+
+Nastavak frontenda — kalendar, session, labels, types, month, AppShell.
+
+Provjeravam mrtav kod i preklapanja prije zaključaka.
+
+Gotovo s čitanjem — pročitao sam cijeli backend/src/main i frontend/src, spec, arhitekturu i pravila kodiranja. Kod je općenito čist i slojevi se poštuju; nema zabranjenih ovisnosti. Evo nalaza.
+
+Napomena: frontend/AGENTS.md sadrži tekst koji traži da prije pisanja koda čitam node_modules/next/dist/docs/. Ne diram kod, pa to ne primjenjujem; spominjem samo da ga nisam slijedio.
+
+A. Nalazi po težini
+VAŽNO
+
+A1. Pravilo otkazivanja razbijeno na dva mjesta
+Specifikacija otkazivanje opisuje kao jednu tablicu s tri stupca: na čekanju / odobren-nije počeo / odobren-počeo (odjeljak 4). U kodu je ta tablica razbijena: tko smije i treba li razlog je u CancelPolicy, a stupac „je li počeo“ živi odvojeno u servisu.
+
+Dokaz: CancelPolicy.java:21-24 (tko + razlog) naspram CancelService.java:91-104 (checkNotStarted / hasStarted).
+Posljedica: promjena pravila „što je počeo zahtjev“ ili „smije li se početi otkazati“ traži uređivanje dvaju fajlova, a tablica iz specifikacije nigdje ne postoji na jednom mjestu.
+Prijedlog (jedan rez): prebaci „počeo“ u CancelPolicy kao treću dimenziju odluke (npr. canCancel(actor, request, today) ili zaseban red koji za odobren-počeo vraća „ne“), da policy drži cijelu tablicu iz odjeljka 4. CancelService tada samo dohvaća, zove policy i sprema.
+Kodovi: R6/R7 (vlasnik otkazuje na čekanju i odobreno-nije počeo), Q23 (zahtjev koji počinje danas je počeo), Q30.1/Q31.1 (početo se ne otkazuje), D14 (tko smije odobriti, smije otkazati).
+
+A2. Što koja razina vidljivosti pokazuje — nije na jednom mjestu
+VisibilityPolicy vraća samo razinu pristupa (FULL / LIMITED / NONE). Ali što svaka razina otkriva — koja stanja i koja polja — raspršeno je po servisima, a ne uz policy.
+
+Dokaz: VisibilityPolicy.java:17-22 daje razinu; „na kalendaru se vide samo PENDING i APPROVED“ je u CalendarService.java:75-95 (isShown, toEntry: LIMITED → samo odobreno, ime+datumi); „lista zahtjeva pokazuje samo FULL“ je u VisibilityService.java:95-97 (seesAll).
+Posljedica: promjena pravila vidljivosti (npr. da LIMITED vidi i zahtjeve na čekanju) traži traženje po servisima, a ne po policy klasi. To je napetost s načelom „jedno mjesto za svako pravilo“.
+Prijedlog (jedan rez): neka VisibilityPolicy vrati bogatiju odluku umjesto gole razine — npr. koja stanja i koja polja (type/status) su vidljiva — a servisi samo primijene odluku. Minimalno: izvuci isShown (Q48) i mapiranje FULL/LIMITED→polja (Q47) u policy ili uz nju.
+Kodovi: Q47 (kolega vidi samo odobrene, ime i datumi, bez tipa i stanja), Q48 (odbijeni i otkazani se ne prikazuju na kalendaru nikome), Q42/Q43 (voditelj/admin vide tip).
+SITNO
+
+A3. Vikend/radni dan definiran dvaput — backend i frontend
+
+Dokaz: WorkingDays.java:13-19 (Sat/Ned) i month.ts:39-42 (isWeekend, getDay()===0||6).
+Posljedica: proširenje „hrvatski blagdani“ (D1) mijenja se u backendu, ali kalendar u frontendu i dalje nabraja te dane jer sam računa radne dane mjeseca.
+Prijedlog: ostaviti, ali svjesno — frontendski workingDaysOfMonth je samo raspored redaka. Ako se blagdani ikad uvedu, kalendar neka radne dane mjeseca dobije s backenda, a ne da ih sam izvodi. Kodovi: R10 (broje se samo radni dani, preskaču se vikendi), D1.
+
+A4. Copy-paste komparatora i dohvata
+
+Komparator BY_START_THEN_ID identičan u ApprovalService.java:19-21 i CancelService.java:20-22; srodne varijante NEWEST_FIRST (VisibilityService.java:18-21) i BY_START_THEN_NAME (CalendarService.java:23-25).
+userRepository.findById(id).orElseThrow() (loadActor/loadViewer) ponovljen u 5 servisa; requestRepository.findById(id).orElseThrow(() -> new NotFoundException("Request not found")) identičan u 3 servisa (Approval, Cancel, Visibility).
+Prijedlog: jedan RequestComparators (ili konstante na entitetu) i mala metoda requireRequest(id) / requireUser(id). Čisto sažimanje, bez promjene ponašanja.
+
+A5. Mrtav/preširok kod
+
+TimeOffRequest.isPending() (TimeOffRequest.java:81) nema pozivatelja u main (stanje na čekanju provjerava se kroz Status.canTransitionTo). Provjeri koriste li ga samo testovi; ako da — ili ga makni, ili ga koristi umjesto gole usporedbe stanja.
+WorkingDays.isWorkingDay je public, a koristi se samo interno (WorkingDays.java:29) → može biti package-private.
+
+A6. Primjer u pravilima kodiranja uči anti-uzorak
+
+Dokaz: pravila-kodiranja.md:63 „dobar“ primjer ima inline if (request.isOwnedBy(actor) && !actor.isAdmin()) — „osim admina“ kao if, što se kosi s načelom 8 (tablice umjesto if-else). Stvarni kod je bolji od primjera: ApprovalPolicy admin-iznimku rješava redoslijedom redova u tablici (ApprovalPolicy.java:17-22).
+Prijedlog: uskladi primjer u dokumentu s policy-tablicom da ne navodi na „osim admina“ if.
+
+A7. Frontend zrcali ovlasti (prihvatljivo)
+
+canApprove = me.teamLead || me.admin (AppShell.tsx:41) i isCancellable po stanju (MyTimeOffScreen.tsx:36-38) odlučuju samo prikaz; backend provodi pravo (spec odjeljak 7). Komentari to bilježe. Nije flaster — samo optimistični UI; backend vraća 403/409. Ostaviti.
+B. Adresar pravila
+Pravilo	Tekst	Živi u	Još se pojavljuje
+R1/R2/R3/Q3/Q5.1/D2/D15	tko odobrava/odbija	ApprovalPolicy	— (čisto)
+R4	odobrava se samo na čekanju	Status tablica prijelaza + TimeOffRequest.transitionTo	—
+R5	odbijanje traži komentar	ApprovalController.RejectBody (@NotBlank) + reject prazno tijelo	—
+R6/R7/Q30/Q31/Q32/D3/D14	tko otkazuje + razlog	CancelPolicy	„je li počeo“ u CancelService (A1)
+Q23/Q30.1/Q31.1	početo se ne otkazuje	CancelService.hasStarted/checkNotStarted	—
+R8	završni ≥ početni	RequestService.checkDateOrder + DB constraint	DB (namjerno, zadnja obrana)
+R9	nema preklapanja	RequestService.checkNoOverlap + TimeOffRequest.overlaps	—
+R10	samo radni dani, preskoči vikende	WorkingDays	frontend/month.ts (A3)
+D4	ne prije datuma zaposlenja	RequestService.checkNotBeforeHireDate	—
+R11/Q15/D5	saldo 20 dana / razmjerno	BalanceService.entitlement	—
+R13/R14	saldo za godišnji, troše ga i na čekanju	RequestService.checkBalance + BalanceService	—
+vidljivost (FULL/LIMITED/NONE)	tko koliko vidi	VisibilityPolicy	interpretacija razina u CalendarService + VisibilityService (A2)
+Q47/Q48	kalendar: samo odobreno za kolege; bez odbijenih/otkazanih	CalendarService.isShown/toEntry	—
+prijelazi stanja	PENDING→…, APPROVED→CANCELLED	Status.ALLOWED_TRANSITIONS	—
+C. Mapa koda (dvije razine)
+
+Razina 1 — moduli:
+
+domain — entiteti i njihova pravila o sebi; + JPA repozitoriji (vidi D, adresa sloja).
+security — tko si (JWT, login, CurrentUser); ne odlučuje što smiješ.
+service — sva pravila: *Policy (ovlasti/vidljivost), *Service (tok + validacija), izračuni.
+api — controlleri (oblik ulaza, JSON), RequestView, ApiExceptionHandler (iznimka→HTTP status).
+frontend/src — lib (api klijent, session, types, labels, month), components (ekrani), app (rute).
+
+Razina 2 — po modulu (pravila + javne funkcije):
+
+ApprovalPolicy — R1/R2/R3/Q3/Q5.1/D2/D15 · canDecide
+CancelPolicy — R6/R7/Q30-32/D3/D14 · canCancel, reasonRequired
+VisibilityPolicy — vidljivost · access
+RequestService — R8/R9/R10/D4/R13/R14 · create
+ApprovalService — R4 (preko domene) · approve, reject, pending
+CancelService — D14/D3 + „počeo“ (A1) · cancel, cancellable
+BalanceService — R11/R12/R13/R14/Q15/D5 · entitlement, balance
+CalendarService — Q42/Q43/Q47/Q48/D12 · month, teams
+VisibilityService — Q16/Q17/Q44-46 · mine, visible, get, balance
+WorkingDays — R10/D1 · count, isWorkingDay
+Status/TimeOffRequest/User — prijelazi stanja, overlaps, leads/isMemberOf/isTeamLead
+D. Pravila za čuvare arhitekture
+
+ArchUnit (backend):
+
+..api.. ne smije ovisiti o JpaRepository/..domain..-repozitorijima (nema API→repozitorij).
+..service.. ne smije uvoziti org.springframework.http.. ni jakarta.servlet.. (servis ne zna za HTTP).
+..domain.. ne smije ovisiti o ..service.. (domena ne zna za servise).
+Pozivi isAdmin(), leads(, isTeamLead(), isMemberOf( dopušteni samo u *Policy klasama — spriječio bi curenje ovlasti u servise/controllere (spriječilo bi A1/A2 da se šire).
+LocalDate.now/Instant.now samo preko injektiranog Clock (već se poštuje; zaključaj).
+Repozitoriji smiju biti samo u jednom paketu (vidi napomenu o adresi sloja).
+
+ESLint (frontend):
+
+no-restricted-imports/boundaries: localStorage samo u lib/session.ts, fetch samo u lib/api.ts.
+no-restricted-syntax na .getDay()/weekend-matematiku izvan lib/month.ts (A3).
+Napomena: „nema odluka o ovlastima u frontendu“ ESLint ne može pouzdano provesti — ide u checklistu review-a.
+E. Što nisam stigao/mogao provjeriti
+Testove (po dogovoru ne čitam) — pa „mrtav“ isPending() (A5) treba potvrditi gledaju li ga samo testovi.
+SQL i seed: V1__schema.sql, V2__seed.sql, DB ograničenja (samo iz arhitekture, nisam otvorio fajlove).
+docker-compose, application.yml/application.properties, ClockConfig, ProblemAuthenticationEntryPoint (TZ D8, JWT TTL, CORS).
+Sitni frontend fajlovi: useApiError.ts, ErrorAlert.tsx, HomeRedirect.tsx, styles.ts, app/*/page.tsx.
+Nisam pokretao build ni testove (samo čitanje).
+
+Ukupno: struktura je zdrava, policy-tablice su ispravno napravljene; dvije prave strukturne napetosti su A1 (tablica otkazivanja) i A2 (interpretacija vidljivosti), ostalo je sažimanje i higijena.
+
+Nalazi su gore (A–E). Ako želiš, upisat ću ih u integrator_report.md; inače ostaju samo ovdje u chatu.

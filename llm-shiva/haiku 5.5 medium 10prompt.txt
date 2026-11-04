@@ -1,0 +1,507 @@
+===== 1-2.md =====
+# Leće 1 i 2: ponavljanja u backendu i frontendu
+
+Pregledano: backend/src/main (service, domain, security, api dijelovi koji su relevantni, V1__schema.sql) i frontend/src (lib/labels.ts, lib/types.ts, components/MyTimeOffScreen.tsx, ApprovalsScreen.tsx, CalendarScreen.tsx). Nisu otvoreni: User.java, BalanceController, ApiExceptionHandler, api.ts, month.ts, ostali api kontroleri. Svaki nalaz je provjeren otvaranjem fajla.
+
+Legenda: VAŽNO = ponavljanje pravila poslovne logike na više mjesta, pa se može razići. SITNO = ponavljanje koda ili popisa bez utjecaja na pravila.
+
+---
+
+## Leća 1: Isto tijelo, drugo ime
+
+Jednostavno: ista logika (ili gotovo ista) napisana je na više mjesta. Ispod su nalazi redom.
+
+**L1-1. Metoda `leadsTeamOfOwner` ima isto tijelo u dvije policy klase.**
+Što: ApprovalPolicy i VisibilityPolicy imaju metodu s istim imenom i istim tijelom: "ima li korisnik vodeći položaj u nekom timu vlasnika". Ovo je pravilo tko je voditelj, a ono mora biti isto za odobravanje i za vidljivost.
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/ApprovalPolicy.java:37 — `.anyMatch(actor::leads);`
+- backend/src/main/java/com/example/timeoff/service/VisibilityPolicy.java:40 — `.anyMatch(viewer::leads);`
+Težina: VAŽNO. Ako se pravilo promijeni u jednoj klasi, druga ostaje stara.
+Kirurški refaktor: dodati u User metodu `leadsTeamOf(User owner)` (`owner.getTeams().stream().anyMatch(this::leads)`) i obje policy klase pozivaju nju.
+
+**L1-2. `sharesTeam` i `leadsTeamOfOwner` u VisibilityPolicy imaju isti oblik tijela.**
+Što: obje metode prolaze kroz `owner.getTeams()` i traže jedan tim s predikatom koji ovisi o viewer. Razlika je samo predikat.
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/VisibilityPolicy.java:39-40 — `return owner.getTeams()` / `.anyMatch(viewer::leads);`
+- backend/src/main/java/com/example/timeoff/service/VisibilityPolicy.java:44-46 — `return owner.getTeams()` / `.anyMatch(viewer::isMemberOf);`
+Težina: SITNO.
+Kirurški refaktor: jedna privatna metoda `anyTeamOf(owner, Predicate<Team>)` koju obje metode koriste. Alternativa je ostaviti, jer su dvije linije.
+
+**L1-3. Mehanizam "prvo pravilo koje vrijedi odlučuje" ponavlja se tri puta.**
+Što: tri policy metode imaju isto tijelo: stream po listi pravila, filter po `applies`, `findFirst`. Razlikuju se samo u tome što se vraća.
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/ApprovalPolicy.java:26-28 — `return RULES.stream()` / `.filter(rule -> rule.applies().test(actor, request))` / `.findFirst()`
+- backend/src/main/java/com/example/timeoff/service/VisibilityPolicy.java:26-28 — `return RULES.stream()` / `.filter(rule -> rule.applies().test(viewer, owner))` / `.findFirst()`
+- backend/src/main/java/com/example/timeoff/service/CancelPolicy.java:39-41 — `return rules.stream()` / `.filter(rule -> rule.applies().test(actor, request))` / `.findFirst();`
+Težina: SITNO (tri linije, ali ista ideja na tri mjesta).
+Kirurški refaktor: generička statička metoda `firstMatch(List<Rule>, ...)` ili zajednički helper; svaka policy zove nju.
+
+**L1-4. Komparator `BY_START_THEN_ID` je definiran dvaput, identično.**
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/ApprovalService.java:19-21 — `Comparator` `.comparing(TimeOffRequest::getStartDate)` `.thenComparing(TimeOffRequest::getId);`
+- backend/src/main/java/com/example/timeoff/service/CancelService.java:20-22 — ista tri linije
+Težina: SITNO.
+Kirurški refaktor: premjestiti konstantu u TimeOffRequest (`public static final Comparator<TimeOffRequest> BY_START_THEN_ID`) i koristiti je u oba servisa.
+
+**L1-5. Metode `pending` i `cancellable` imaju isti oblik tijela.**
+Što: obje učitaju aktora, uzmu zahtjeve po statusu, filtriraju po policy, sortiraju po `BY_START_THEN_ID`. Razlikuju se status i dodatni filter (CancelService još filtrira `!hasStarted`).
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/ApprovalService.java:69-73 — `return requestRepository.findByStatus(Status.PENDING)` / `.stream()` / `.filter(request -> approvalPolicy.canDecide(actor, request))` / `.sorted(BY_START_THEN_ID)` / `.toList();`
+- backend/src/main/java/com/example/timeoff/service/CancelService.java:65-71 — `return requestRepository.findByStatus(Status.APPROVED)` / `.stream()` / `.filter(request -> !request.isSubmittedBy(actor))` / `.filter(request -> cancelPolicy.canCancel(actor, request))` / `.filter(request -> !hasStarted(request))` / `.sorted(BY_START_THEN_ID)` / `.toList();`
+Težina: SITNO.
+Kirurški refaktor: ostaviti kao jesu; ako se doda treći popis, izvući zajedničku metodu `listDecidable(status, predicate)`.
+
+**L1-6. `loadViewer` je identičan u dva servisa.**
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/VisibilityService.java:99-101 — `return userRepository.findById(viewerId)` / `.orElseThrow();`
+- backend/src/main/java/com/example/timeoff/service/CalendarService.java:131-133 — ista dva retka
+Dodatno: isti uzorak (`findById(...).orElseThrow()`) stoji i u ApprovalService.java:76-78 (`loadActor`), CancelService.java:43-44 i 62-63 (inline), BalanceService.java:53-54.
+Težina: SITNO.
+Kirurški refaktor: jedna metoda za učitavanje korisnika (npr. u UserRepository kao default metoda `require(id)`) i pozivi na nju.
+
+**L1-7. Dohvat zahtjeva s iznimkom "Request not found" je kopiran tri puta.**
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/ApprovalService.java:83-84 — `.orElseThrow(() -> new NotFoundException("Request not found"));`
+- backend/src/main/java/com/example/timeoff/service/CancelService.java:45-46 — ista linija
+- backend/src/main/java/com/example/timeoff/service/VisibilityService.java:69-70 — ista linija
+Težina: SITNO (ako se promijeni tekst poruke, treba na tri mjesta).
+Kirurški refaktor: default metoda `findOrThrow(Long id)` u TimeOffRequestRepository.
+
+**L1-8. Metode `approve` i `reject` u ApprovalService imaju gotovo isto tijelo.**
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/ApprovalService.java:42-49 — `User actor = loadActor(actorId);` / `TimeOffRequest request = loadDecidable(requestId, actor);` / `Instant now = clock.instant();` / `request.approve(actor, decisionComment, now);`
+- backend/src/main/java/com/example/timeoff/service/ApprovalService.java:55-61 — ista tri linije početka i `request.reject(actor, comment, now);`
+Razlika: approve prije toga zove `Texts.blankToNull(comment)`, reject ne.
+Težina: SITNO.
+Kirurški refaktor: ostaviti; razlika u komentaru je namjerna (R5 traži komentar kod odbijanja). Nije potrebna promjena.
+
+---
+
+## Leća 2: Isti skup vrijednosti
+
+Jednostavno: isti popis vrijednosti (PENDING, APPROVED, ...) ili ista grupa vrijednosti stoji na više mjesta u kodu, u bazi i u frontendu. Ako se doda ili promijeni vrijednost, mora se mijenjati na svakom mjestu.
+
+**L2-1. Skup statusa je zapisan u Javi, SQL-u i frontendu.**
+Dokaz:
+- backend/src/main/java/com/example/timeoff/domain/Status.java:8-11 — `PENDING,` / `APPROVED,` / `REJECTED,` / `CANCELLED;`
+- backend/src/main/resources/db/migration/V1__schema.sql:29 — `status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),`
+- frontend/src/lib/types.ts:5 — `export type RequestStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";`
+- frontend/src/lib/labels.ts:11-16 — `STATUS_LABELS: Record<RequestStatus, string>` s ključevima PENDING, APPROVED, REJECTED, CANCELLED
+Težina: VAŽNO. Dodavanje statusa mijenja četiri mjesta, a SQL CHECK i Java enum se ne provjeravaju međusobno pri prevođenju.
+Kirurški refaktor: za frontend je TypeScript već prijavio bi nepotpun Record. Za bazu: nova Flyway migracija koja mijenja CHECK pri svakoj promjeni enuma. Nema druge sigurne jednostavne promjene.
+
+**L2-2. Skup vrsta odsustva je zapisan u Javi, SQL-u i frontendu, a u labels.ts dvaput.**
+Dokaz:
+- backend/src/main/java/com/example/timeoff/domain/TimeOffType.java:4-6 — `VACATION,` / `SICK_LEAVE,` / `DAY_OFF`
+- backend/src/main/resources/db/migration/V1__schema.sql:25 — `CHECK (type IN ('VACATION', 'SICK_LEAVE', 'DAY_OFF'))`
+- frontend/src/lib/types.ts:3 — `export type TimeOffType = "VACATION" | "SICK_LEAVE" | "DAY_OFF";`
+- frontend/src/lib/labels.ts:5-9 — `TYPE_LABELS` s ključevima VACATION, SICK_LEAVE, DAY_OFF
+- frontend/src/lib/labels.ts:18 — `export const TYPE_OPTIONS: TimeOffType[] = ["VACATION", "SICK_LEAVE", "DAY_OFF"];`
+Težina: VAŽNO. TYPE_OPTIONS je ručno napisana lista koja može odstupiti od TYPE_LABELS, a ta dva popisa bi trebala biti isti.
+Kirurški refaktor: u labels.ts zamijeniti ručni popis: `export const TYPE_OPTIONS = Object.keys(TYPE_LABELS) as TimeOffType[];`. Redoslijed ostaje jer Object.keys čuva redoslijed unosa.
+
+**L2-3. Skup "PENDING ili APPROVED" ponavlja se u backendu i frontendu s različitim imenima.**
+Što: ista dva statusa koriste se za tri različita pravila: prikaz u kalendaru, provjera preklapanja, i može li korisnik otkazati. Pravila nisu ista, ali je skup vrijednosti isti, pa bi se mogao promijeniti na jednom mjestu.
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/CalendarService.java:76-78 — `Status status = request.getStatus();` / `return status == Status.PENDING || status == Status.APPROVED;`
+- backend/src/main/java/com/example/timeoff/service/RequestService.java:102 — `.filter(request -> request.getStatus() == Status.PENDING || request.getStatus() == Status.APPROVED)`
+- frontend/src/components/MyTimeOffScreen.tsx:36-38 — `function isCancellable(request: TimeOffRequest): boolean {` / `return request.status === "PENDING" || request.status === "APPROVED";`
+Težina: VAŽNO. Frontend isCancellable kopira backendovo pravilo za otkazivanje (CancelPolicy). Ako se pravilo promijeni na backendu, gumb na ekranu ostaje pogrešan.
+Kirurški refaktor: u Status.java dodati `public boolean isOpen() { return this == PENDING || this == APPROVED; }` i koristiti ga u CalendarService i RequestService. Na frontendu: isCancellable može ostati, ali bi ga trebalo označiti kao kopiju backend pravila.
+
+**L2-4. Usporedbe vrijednosti Access enuma su na više mjesta.**
+Što: pitanje "je li vidljivost FULL" i "je li LIMITED" ponavlja se u dva servisa. Komentar u CalendarService također ponavlja značenje FULL i LIMITED.
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/CalendarService.java:87 — `if (access == Access.FULL) {`
+- backend/src/main/java/com/example/timeoff/service/CalendarService.java:90 — `if (access == Access.LIMITED && approved) {`
+- backend/src/main/java/com/example/timeoff/service/VisibilityService.java:96 — `return visibilityPolicy.access(viewer, owner) == Access.FULL;`
+- backend/src/main/java/com/example/timeoff/service/CalendarService.java:81 — komentar `// FULL: pending and approved, with type and status (Q42, Q43). LIMITED: approved only, name and dates (Q47).`
+Težina: SITNO.
+Kirurški refaktor: metode `isFull()` na Access enumu. Alternativa je ostaviti, jer je enum mali.
+
+**L2-5. Usporedbe s APPROVED i PENDING su raspršene po domeni i servisima.**
+Dokaz (izbor):
+- backend/src/main/java/com/example/timeoff/service/CancelService.java:65 — `findByStatus(Status.APPROVED)`
+- backend/src/main/java/com/example/timeoff/service/CancelService.java:92 — `request.getStatus() == Status.APPROVED && hasStarted(request)`
+- backend/src/main/java/com/example/timeoff/service/BalanceService.java:57-58 — `vacationDays(requests, year, Status.APPROVED);` i `Status.PENDING);`
+- backend/src/main/java/com/example/timeoff/domain/TimeOffRequest.java:82 — `return status == Status.PENDING;`
+Težina: SITNO. Enum je tipiziran, pa nema greške, ali nema ni jedne metode koja to izražava.
+Kirurški refaktor: ostaviti; eventualno uvesti `isApproved()`/`isPending()` na Status ako se broj mjesta poveća.
+
+**L2-6. VACATION se koristi kao posebno pravilo na dva mjesta u Javi, a kao zadana vrijednost na frontendu.**
+Dokaz:
+- backend/src/main/java/com/example/timeoff/service/BalanceService.java:73 — `.filter(request -> request.getType() == TimeOffType.VACATION)`
+- backend/src/main/java/com/example/timeoff/service/RequestService.java:112 — `if (command.type() != TimeOffType.VACATION) {`
+- frontend/src/components/MyTimeOffScreen.tsx:18 — `const EMPTY_FORM: NewRequest = { type: "VACATION", startDate: "", endDate: "", reason: "" };`
+Težina: SITNO. Pravilo "samo godišnji ima saldo" je u dvije Java klase, a frontend zna zadanu vrstu.
+Kirurški refaktor: ostaviti; eventualno `TimeOffType.countsAgainstBalance()` u enumu ako se pravilo proširi.
+
+**L2-7. Frontend ponavlja značenje statusa CANCELLED i PENDING u funkciji za tekst.**
+Dokaz:
+- frontend/src/components/MyTimeOffScreen.tsx:23 — `const byName = request.status === "CANCELLED" ? request.cancelledByName : request.decidedByName;`
+- frontend/src/components/MyTimeOffScreen.tsx:25 — `if (request.status === "PENDING" || !byName) {`
+Težina: SITNO. Pravilo "tko je odlučio" ovisi o statusu i zapisano je kao literali.
+Kirurški refaktor: ostaviti; alternativa je u types.ts imati mapu status na polje s imenom, ali to nije nužno.
+
+---
+
+Broj nalaza: Leća 1 = 8 (L1-1 do L1-8). Leća 2 = 7 (L2-1 do L2-7).
+
+===== 3-10.md =====
+# Leće 3 i 10 (integrator, samo čitanje)
+
+Pregledano: backend/src/main/java/com/example/timeoff (service, domain, security, api) i frontend/src. Orijentacija: llm-shiva/lece/mapa.md. Ostali fajlovi u llm-shiva/ nisu čitani.
+
+Oznake: VAŽNO = korisnik vidi pogrešno stanje ili se pogrešno odlučuje o pravu; SITNO = dupliciranje ili slabija poruka, bez pogrešnog ishoda danas.
+
+---
+
+## Leća 3. Uloge izvan Policy klasa
+
+Izvan *Policy klasa nema pozive na isAdmin/isTeamLead/leads/isMemberOf koji odlučuju o pravu pristupa. Nalazi su dupliciranje pravila ili mjesta gdje servis sam odlučuje o vidljivosti.
+
+**L3-1 (SITNO).** Servis sam odlučuje da admin vidi sve timove, pravilo je dupli od VisibilityPolicy.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/CalendarService.java:68`: `List<Team> teams = viewer.isAdmin() ? teamRepository.findAll() : List.copyOf(viewer.getTeams());`
+- Pravilo "admin vidi sve" već postoji u `VisibilityPolicy.java:19`: `new Rule((viewer, owner) -> viewer.isAdmin(), Access.FULL),      // brief, Q17, Q43`
+- Danas su oba u skladu. Ako se pravilo za admina promijeni u politici, popis timova ostaje stari.
+- Kirurški refaktor: u `VisibilityPolicy` dodati metodu `teamsVisibleTo(User viewer, List<Team> all)` i u `CalendarService.teams` pozvati nju umjesto ternarnog operatora.
+
+**L3-2 (SITNO).** Filter "samo tuđi zahtjevi" za popis otkazivih živi u servisu, izvan CancelPolicy.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/CancelService.java:67`: `.filter(request -> !request.isSubmittedBy(actor))`
+- Pravilo za vlastiti zahtjev je u `CancelPolicy.java:22`: `new Rule((actor, request) -> request.isSubmittedBy(actor), false),  // R6, R7`, a komentar na liniji 59 kaže da lista ima samo tuđe zahtjeve. Dvije mjesta opisuju istu granicu.
+- Kirurški refaktor: u `CancelPolicy` dodati `public boolean isOthersRequest(User actor, TimeOffRequest request)` i u `cancellable` koristiti nju.
+
+**L3-3 (SITNO).** Admin i voditelj tima se šalju frontendu kao zastavice i frontend na njima odlučuje o navigaciji.
+- Dokaz: `backend/src/main/java/com/example/timeoff/security/UserView.java:19-20`: `user.isAdmin(),` i `user.isTeamLead()`
+- Backend sam ne koristi ove zastavice za odluku. Vidi L10-3.
+- Kirurški refaktor: dodati u `UserView` polje `canApprove` izračunato u backendu (admin ili voditelj) pa frontend koristi samo to polje.
+
+Provjereno i nije nalaz: `VisibilityService.java:61, 72, 86` (`seesAll`) samo zove `VisibilityPolicy.access`; `ApprovalPolicy`, `CancelPolicy`, `VisibilityPolicy` su u Policy klasama; `User.leads`, `User.isMemberOf`, `TimeOffRequest.isSubmittedBy` pozivaju se samo iz politika i iz L3-2.
+
+**Broj nalaza Leće 3: 3** (L3-1 do L3-3).
+
+---
+
+## Leća 10. Frontend odlučuje
+
+**L10-1 (VAŽNO).** Gumb Otkaži pokazuje se za svaki odobreni zahtjev, i za onaj koji je već počeo. Backend ga odbija.
+- Dokaz frontenda: `frontend/src/components/MyTimeOffScreen.tsx:36-38`: `function isCancellable(request: TimeOffRequest): boolean {` / `return request.status === "PENDING" || request.status === "APPROVED";`
+- Dokaz backenda: `backend/src/main/java/com/example/timeoff/service/CancelService.java:92`: `boolean started = request.getStatus() == Status.APPROVED && hasStarted(request);` i `:95`: `throw new RuleViolationException("Request has already started");`
+- Što se dogodi ako se ne slažu: korisnik klikne Otkaži na zahtjevu koji je počeo, dobije poruku "Request has already started" i ne može otkazati. Ništa se ne pokvari, ali gumb laže.
+- Kirurški refaktor: u `RequestView` dodati polje `canCancel` koje backend izračuna (CancelPolicy + hasStarted) i u `MyTimeOffScreen.tsx` zamijeniti `isCancellable` s `request.canCancel`.
+
+**L10-2 (SITNO).** Stupac Komentar prikazuje odobrenje, a razlog otkazivanja se skriva kad postoji komentar odobrenja.
+- Dokaz: `frontend/src/components/MyTimeOffScreen.tsx:33`: `return request.decisionComment ?? request.cancelReason ?? "";`
+- Backend ih čuva odvojeno: `backend/src/main/java/com/example/timeoff/domain/TimeOffRequest.java:39` `private String decisionComment;` i `:47` `private String cancelReason;`. Zahtjev odobren s komentarom pa otkazan s razlogom pokazuje samo komentar odobrenja.
+- Kirurški refaktor: u `commentText` vratiti `request.status === "CANCELLED" ? request.cancelReason : request.decisionComment`, po uzoru na `statusText` u istom fajlu (linija 23).
+
+**L10-3 (SITNO).** Frontend sam odlučuje hoće li se prikazati link Odobravanja, prema ulozi.
+- Dokaz: `frontend/src/components/AppShell.tsx:41`: `const canApprove = me.teamLead || me.admin;`
+- Danas je u skladu s backendom: `ApprovalPolicy.java:18-21` (admin ili vodi tim vlasnika) i `User.java:82-83` (voditelj = vodi barem jedan tim). Ako se pravilo promijeni samo na backendu, link ostaje skriven ili se prikazuje prazna stranica.
+- Kirurški refaktor: koristiti zastavicu `canApprove` iz L3-3 umjesto dvije zastavice na frontendu.
+
+**L10-4 (SITNO).** Gumbi Odobri, Odbij i Otkaži na stranici Odobravanja pokazuju se u svakom retku bez provjere prava.
+- Dokaz: `frontend/src/components/ApprovalsScreen.tsx:121-134` (Odobri i Odbij) i `:184-190` (Otkaži), bez uvjeta.
+- Danas je u skladu jer backend filtrira listu (`ApprovalService.java:71` `filter(request -> approvalPolicy.canDecide(actor, request))`). Ako lista ikad uključi redak koji korisnik ne smije odlučiti, klik vraća 403 "You cannot approve or reject this request" (`ApprovalService.java:87`).
+- Kirurški refaktor: nema promjene koda; dovoljno je da backend lista ostane jedini izvor (ne mijenjati ništa na frontendu).
+
+**L10-5 (SITNO).** Polje razloga pri otkazu tuđeg zahtjeva i komentar pri odbijanju nisu označeni kao obavezni. Backend traži ih nakon klika.
+- Dokaz: `frontend/src/components/ApprovalsScreen.tsx:176` `Cancel reason` i `:113-120` (polje Comment), bez `required`. Frontend šalje `reasons[request.id] ?? ""` (`:187`).
+- Backend: `backend/src/main/java/com/example/timeoff/service/CancelService.java:86`: `throw new InvalidRequestException("reason must not be blank");`; za odbijanje `ApprovalService.java:52-53` (komentar "The comment is required (R5)").
+- Frontend to svjesno prepušta backendu (`ApprovalsScreen.tsx:68`: `// No check that a comment or reason is filled in: the backend answers 400 (R5, D3).`). Korisnik ne vidi da je polje obavezno dok ne dobije 400.
+- Kirurški refaktor: dodati `required` i zvjezdicu uz labelu (`Cancel reason *`) bez provjere u kodu; pravilo ostaje na backendu.
+
+**L10-6 (SITNO).** Forma za novi zahtjev nema nikakve provjere unosa, a `noValidate` gasi i ugrađene provjere preglednika.
+- Dokaz: `frontend/src/components/MyTimeOffScreen.tsx:207`: `noValidate`. Podaci idu bez provjere u `frontend/src/lib/api.ts:111-118` (`startDate: request.startDate, endDate: request.endDate`).
+- Backend provjerava redoslijed datuma, jednu godinu, radni dan, datum zaposlenja, preklapanje i saldo (`backend/src/main/java/com/example/timeoff/service/RequestService.java:69-108`). Kako se prazni datumi obrade na backendu nisam provjerio, pa ne tvrdim koja će poruka korisniku doći.
+- Kirurški refaktor: dodati `required` na datumska polja (bez `noValidate`), a backend neka za prazan datum vrati jasan `detail`.
+
+**L10-7 (SITNO).** Frontend ima vlastitu definiciju radnog dana (vikend), a backend ima istu u jednom mjestu, s najavom da će se dodavati praznici.
+- Dokaz frontenda: `frontend/src/lib/month.ts:39-41`: `function isWeekend(year: number, monthIndex: number, day: number): boolean {` / `return weekday === 0 || weekday === 6;`
+- Dokaz backenda: `backend/src/main/java/com/example/timeoff/service/WorkingDays.java:9`: `// The one place that decides what a working day is; holidays would be added here (D1).` i `:13` `WEEKEND`.
+- Što se dogodi kad se ne slažu: kad se dodaju praznici na backendu, kalendar će i dalje prikazivati odsustva na praznicima kao radne dane (`CalendarScreen.tsx:82` `groupByDay` koristi `workingDaysOfMonth`), a brojanje dana na backendu ih neće brojati.
+- Kirurški refaktor: backend vraća popis radnih dana mjeseca (ili oznaku po danu) uz `/api/calendar`, a `month.ts` `workingDaysOfMonth` se briše.
+
+**L10-8 (SITNO).** Početni mjesec kalendara računa preglednik, a "danas" za saldo računa server.
+- Dokaz: `frontend/src/lib/month.ts:18`: `const now = new Date();`
+- Backend: `backend/src/main/java/com/example/timeoff/service/ClockConfig.java:13`: `return Clock.systemDefaultZone();` i `VisibilityService.java:90`: `LocalDate today = LocalDate.now(clock);`, koji određuje godinu salda.
+- Ako se zona preglednika razlikuje od zone servera, kalendar može otvoriti drugi mjesec (npr. siječanj) nego što saldo misli da je tekuća godina.
+- Kirurški refaktor: pustiti backend da vrati tekući mjesec (npr. polje `currentMonth` u `/api/me`) pa frontend koristi njega.
+
+Provjereno i nije nalaz: `CalendarScreen.tsx:18-20` (`coversDay`, uspoređuje "yyyy-MM-dd" stringove, što je ispravno); `CalendarScreen.tsx:32` (`entryText` odlučuje o prikazu po prisutnosti polja koje backend šalje, pa je konzistentno); `useApiError.ts:14-17` i `api.ts:83-85` (401 vodi na prijavu, a token se briše); `LoginScreen.tsx:15` (eksplicitno prepušta prazna polja backendu).
+
+**Broj nalaza Leće 10: 8** (L10-1 do L10-8).
+
+---
+
+## Sažetak
+
+- Leća 3: 3 nalaza, nijedan VAŽNO.
+- Leća 10: 8 nalaza, jedan VAŽNO (L10-1).
+
+===== 4-5.md =====
+# Leće 4 i 5: vrijeme i istodobnost
+
+Pregledano: backend/src/main i frontend/src. Mapa (llm-shiva/lece/mapa.md) je provjerena i tačna za mjesta na kojima se računa "danas" i za prijelaze statusa. Nisu čitani testovi ni drugi fajlovi u llm-shiva/.
+
+---
+
+## Leća 4. Vrijeme i sat
+
+### Gdje se računa "danas" ili trenutak
+
+| Mjesto | Kod | Sloj | Koristi Clock? |
+|---|---|---|---|
+| ClockConfig.java:13 | `Clock.systemDefaultZone()` | konfiguracija | da, definira bean |
+| RequestService.java:55 | `Instant now = clock.instant();` | servis | da (createdAt) |
+| ApprovalService.java:45, :57 | `clock.instant()` | servis | da (decidedAt) |
+| CancelService.java:53 | `clock.instant()` | servis | da (cancelledAt) |
+| CancelService.java:101 | `LocalDate today = LocalDate.now(clock);` | servis | da (hasStarted) |
+| VisibilityService.java:90 | `LocalDate today = LocalDate.now(clock);` | servis | da (godina salda) |
+| BalanceController.java:34 | `LocalDate today = LocalDate.now(clock);` | api | da (godina salda) |
+| security/TokenService.java:27 | `Instant issuedAt = Instant.now();` | security | NE, poziva statički sat |
+| frontend lib/month.ts:18 | `const now = new Date();` | frontend | ne, sat preglednika |
+
+Provjereno i nema "danas": RequestService.java:116 (godina iz datuma zahtjeva), BalanceService.java:36 (godina zaposlenja), WorkingDays i CalendarService (rade s datumima iz ulaza, bez sata).
+
+### Nalazi
+
+**L4-1 (SITNO): token se izdaje s satom koji ne prolazi kroz Clock.**
+- Što: TokenService računa `iat` i `exp` preko `Instant.now()`, dok ostatak backenda ide preko Clock beana.
+- Dokaz: TokenService.java:27, doslovno: `Instant issuedAt = Instant.now();`. Suprotno tvrdi ClockConfig.java:7: `// "Today" for every rule comes from this clock, in the zone set by TZ (D8); tests replace it with a fixed clock.`
+- Utjecaj: token se ne može testirati fiksnim satom. Za pravila poslovne logike ovo nije problem, pa je SITNO.
+- Kirurški refaktor: u konstruktor TokenService dodati `Clock clock` i pisati `Instant.now(clock)`.
+
+**L4-2 (SITNO): godina za saldo računa se na dva mjesta, jedno u api sloju.**
+- Što: BalanceController sam računa tekuću godinu i poziva servis. VisibilityService radi istu stvar za drugog korisnika.
+- Dokaz: BalanceController.java:34 `LocalDate today = LocalDate.now(clock);` i :36 `return balanceService.balance(userId, today.getYear());`. Isto u VisibilityService.java:90 `LocalDate today = LocalDate.now(clock);` i :92 `return balanceService.balance(userId, today.getYear());`.
+- Utjecaj: pravilo "tekuća godina" (R12) je u dva sloja. Ako se promijeni, treba mijenjati na dva mjesta.
+- Kirurški refaktor: u BalanceService dodati `currentBalance(Long userId, Clock clock)` koji računa godinu, a oba mjesta pozivaju tu metodu.
+
+**L4-3 (SITNO): zadana mjesec kalendara dolazi iz sata preglednika, a ne iz servera.**
+- Što: kalendar otvara mjesec prema datumu u pregledniku. Server za pravila koristi TZ zonu (ClockConfig.java:7). Blizu ponoći na kraju mjeseca ta dva datuma mogu biti različita.
+- Dokaz: lib/month.ts:18 `const now = new Date();`. CalendarScreen.tsx:42 `const [month, setMonth] = useState(currentMonth);`.
+- Utjecaj: samo prikaz zadanog mjeseca. Nema utjecaja na pravila.
+- Kirurški refaktor: ako se želi jedna istina o "danas", server vraća tekući mjesec (npr. u /api/me), a frontend ga koristi kao zadani. Inače: ostaviti i zabilježiti kao namjerno.
+
+---
+
+## Leća 5. Istodobnost i transakcije
+
+### Što postoji, a što ne
+
+- Sve tri operacije (create, approve/reject, cancel) su `@Transactional`, ali bez zaključavanja: nema `@Lock`, `@Version`, `synchronized` ni `SELECT ... FOR UPDATE` u backend/src/main (grep, bez pogodaka).
+- application.properties nema postavku razine izolacije. Vrijedi zadana razina PostgreSQL-a, READ COMMITTED.
+- V1__schema.sql (time_off_requests, redovi 22-39) ima samo CHECK ograničenja (tip, status, `end_date >= start_date`). Nema UNIQUE, EXCLUDE ni provjere preklapanja. R9 (preklapanje) živi samo u kodu.
+- Frontend: gumb za slanje nema stanje "u tijeku": MyTimeOffScreen.tsx:88-91 `async function handleSubmit(...)` šalje odmah. Nema `disabled` nigdje u frontend/src.
+
+Što radi ispravno: slijedni zahtjevi. Ako prvi zahtjev već commitan, drugi vidi njegovo stanje. Primjer: Status.java:14-15 dopušta `PENDING -> APPROVED`, a `APPROVED -> CANCELLED`. Nakon commita, ponovni approve dobije REJECTED/APPROVED iz baze i prijelaz se odbija. Istodobni zahtjevi nisu zaštićeni.
+
+### Nalazi
+
+**L5-1 (VAZNO): dva istodobna zahtjeva istog korisnika mogu se preklopiti.**
+- Tok: RequestService.create provjerava preklapanje čitanjem (`findByOwner`), pa tek onda sprema. Dva zahtjeva koja stignu u isto vrijeme oba vide "nema preklapanja", oba se spremaju i nastaju dva PENDING zahtjeva za iste dane.
+- Dokaz: RequestService.java:42 `User owner = userRepository.findById(userId)` (bez zaključavanja), :51 `checkNoOverlap(owner, start, end);`, :100 `List<TimeOffRequest> existing = requestRepository.findByOwner(owner);`, :65 `return requestRepository.save(request);`. Baza nema ograničenje (V1__schema.sql:37-38).
+- Dodatni okidač: MyTimeOffScreen.tsx:88-91 nema zaštitu od dvostrukog klika. Sekvencijalni dvostruki klik hvata server, ali dva paralelna POST-a mogu proći.
+- Kirurški refaktor: u UserRepository dodati `@Lock(LockModeType.PESSIMISTIC_WRITE)` na dohvat korisnika po ID-u i koristiti ga na RequestService.java:42. Tako se zahtjevi istog korisnika izvršavaju redom, a čitanje nakon zaključavanja vidi commitane podatke.
+
+**L5-2 (VAZNO): dva istodobna zahtjeva za odmor mogu zajedno premašiti saldo.**
+- Tok: saldo se provjerava (RequestService.java:52 `checkBalance(userId, command);`) prije spremanja. Dva zahtjeva koja se istovremeno provjere protiv istog preostalog salda prođu oba.
+- Dokaz: RequestService.java:117 `Balance balance = balanceService.balance(userId, year);` i :121 `if (requested > remaining) {`. BalanceService.java:55 čita `findByOwner`, bez zaključavanja.
+- Kirurški refaktor: isti kao L5-1. Zaključavanje korisnika na :42 pokriva i preklapanje i saldo, jer oba čitanja idu nakon zaključavanja.
+
+**L5-3 (VAZNO): dvije odluke nad istim zahtjevom: druga tiho poništi prvu.**
+- Tok: approve i reject učitaju zahtjev kao PENDING, promijene stanje u memoriji i commitaju. Nema provjere verzije. Obje odluke uspiju, a upisuje se zadnja. Npr. dva odobravatelja: jedan odobri, drugi odbije. Oba dobiju uspjeh, a u bazi ostane jedna odluka, s decided_by i decidedAt druge.
+- Dokaz: ApprovalService.java:43 `TimeOffRequest request = ...` (učitava preko loadDecidable), :47 `request.approve(actor, decisionComment, now);`. TimeOffRequest.java:110 `if (!status.canTransitionTo(target)) {` i :114 `status = target;`. Nema `@Version` nigdje u backend/src/main. Komentar ApprovalService.java:81 tvrdi `// The pending state (R4) is checked by the request itself when it changes (T1).`, što je točno samo za sekvencijalne pozive.
+- Napomena o Hibernateu: bez @DynamicUpdate (TimeOffRequest.java nema tu oznaku) Hibernate pri spremanju piše sve stupce, pa zadnji commit prepisuje i ono što je prvi upisao.
+- Kirurški refaktor: u TimeOffRequest dodati `@Version private Long version;`, u novu migraciju dodati stupac `version BIGINT NOT NULL DEFAULT 0`, i u ApiExceptionHandler mapirati OptimisticLockingFailureException na 409 (kao CONFLICT u redovima 35 i 55).
+
+**L5-4 (SITNO): dvostruko otkazivanje i otkazivanje naspram odobravanja.**
+- Tok: cancel učita zahtjev, provjeri stanje u memoriji i commita. Dva istodobna otkazivanja uspiju oba, a drugo prepisuje cancelled_by i cancelReason. Otkazivanje istodobno s odobravanjem može završiti tako da se otkazivanje tiho izgubi (ili obrnuto).
+- Dokaz: CancelService.java:45 `TimeOffRequest request = requestRepository.findById(requestId)`, :54 `request.cancel(actor, cancelReason, now);`. Komentar CancelService.java:90 `// The pending state (R6) has no such limit; terminal states are refused by the request itself (T1).` opet vrijedi samo sekvencijalno.
+- Zašto SITNO: istodobnost dvaju različitih aktera na istom zahtjevu je rijetka. Isti uzrok kao L5-3.
+- Kirurški refaktor: isti kao L5-3 (`@Version` na TimeOffRequest).
+
+---
+
+## Sažetak
+
+- Leća 4: 3 nalaza (L4-1 do L4-3), svi SITNO.
+- Leća 5: 4 nalaza (L5-1 do L5-4). VAZNO: L5-1, L5-2, L5-3. SITNO: L5-4.
+- Zajednički korijen L5-1 i L5-2: nema zaključavanja ni ograničenja u bazi. Jedna promjena (zaključavanje korisnika u create) rješava oba. L5-3 i L5-4 rješava `@Version`.
+
+===== 6-8.md =====
+# Leće 6 i 8: popis prema radnji, te prazno, null i obrezivanje
+
+Pregledan kod: backend/src/main/java i frontend/src. Mapa (llm-shiva/lece/mapa.md) služila je za orijentaciju; svaki nalaz provjeren je u fajlu.
+
+## Leća 6. Popis prema radnji
+
+Endpointi koji vraćaju popis "što smiješ napraviti": GET /api/approvals (ApprovalService.pending, uvjet canDecide), GET /api/approvals/cancellable (CancelService.cancellable, uvjet canCancel plus filteri). Ostale radnje (approve, reject, cancel) provjeravaju isti uvjet pri izvršenju. Dodatno, frontend na ekranu Moja odsustva sam računa koje gumbe prikazati, bez popisa s backenda.
+
+**L6-1 (VAŽNO)** Frontend računa "smije li se otkazati" sam i ne zna za pravilo "zahtjev je već počeo". Backend to pravilo ima, pa gumb Cancel ostaje vidljiv za odobreni zahtjev koji je već počeo, a klik vraća 409.
+- Za: developer (frontend), uz pregled backend pravila.
+- Dokaz: frontend/src/components/MyTimeOffScreen.tsx:36-38, redak 37: `return request.status === "PENDING" || request.status === "APPROVED";`
+- Dokaz: backend/src/main/java/com/example/timeoff/service/CancelService.java:92, redak 92: `boolean started = request.getStatus() == Status.APPROVED && hasStarted(request);`
+- Kirurški refaktor: u RequestView dodati boolean `cancellable` koji backend popuni pozivom istog pravila (npr. CancelService), a MyTimeOffScreen.tsx:36-38 (isCancellable) zamijeniti čitanjem tog polja.
+
+**L6-2 (VAŽNO, treba provjeriti sa specifikacijom)** Admin smije odobriti i odbiti vlastiti zahtjev. Pravilo za admina je prvo, pravilo "vlastiti zahtjev se ne odobrava" (R3) je iza njega, pa prvo pravilo pobjeđuje. Vlastiti zahtjev admina zato se pojavljuje na popisu za odobravanje (GET /api/approvals) i može se odobriti.
+- Za: tim koji vodi specifikaciju (provjeriti je li admin izuzetak namjeran).
+- Dokaz: backend/src/main/java/com/example/timeoff/service/ApprovalPolicy.java:18, redak 18: `new Rule((actor, request) -> actor.isAdmin(), true),                   // R2, Q1.1, D15`
+- Dokaz: ApprovalPolicy.java:19, redak 19: `new Rule((actor, request) -> request.isSubmittedBy(actor), false),     // R3`
+- Kirurški refaktor ako nije namjerno: zamijeniti redoslijed redaka 18 i 19, ili dodati u pravilo admina uvjet `&& !request.isSubmittedBy(actor)`.
+
+**L6-3 (SITNO)** Uvjet "vlastiti zahtjev" napisan je na tri mjesta: u CancelPolicy (pravilo prvo), u ApprovalPolicy (pravilo iza admina) i u CancelService.cancellable kao filter. Sada daju isti rezultat za običnog korisnika, ali se mogu razići ako se jedno promijeni.
+- Za: developer (održavanje).
+- Dokaz: backend/src/main/java/com/example/timeoff/service/CancelPolicy.java:22, redak 22: `new Rule((actor, request) -> request.isSubmittedBy(actor), false),  // R6, R7`
+- Dokaz: backend/src/main/java/com/example/timeoff/service/CancelService.java:67, redak 67: `.filter(request -> !request.isSubmittedBy(actor))`
+- Kirurški refaktor: staviti uvjet u jednu metodu (npr. `TimeOffRequest.isOwnedBy(actor)`) i koristiti je na sva tri mjesta.
+
+**L6-4 (SITNO)** Odjeljak "Approved requests" na ekranu za odobravanja prikazuje samo podskup odobrenih zahtjeva, onaj koji backend smatra otkazivim (bez vlastitih i bez počelih). Naslov obećava više nego što se prikaže.
+- Za: frontend (naslov) i tester (očekivanja).
+- Dokaz: frontend/src/components/ApprovalsScreen.tsx:209, redak 209: `<h2 className="text-lg font-semibold">Approved requests</h2>`
+- Dokaz: backend/src/main/java/com/example/timeoff/service/CancelService.java:65-69 (filteri nad APPROVED zahtjevima).
+- Kirurški refaktor: preimenovati naslov u "Cancellable approved requests" ili "Approved requests you can cancel".
+
+## Leća 8. Prazno, null i obrezivanje
+
+Mjesta gdje se tekst pretvara u null ili provjerava je li prazan:
+- service/Texts.java:9-14 `blankToNull`: prazan i samo-razmakni tekst postaje null, tekst se ne obrezuje.
+- ApprovalService.java:44 (komentar odobrenja): `String decisionComment = Texts.blankToNull(comment);`
+- CancelService.java:47 (razlog otkazivanja): `String cancelReason = Texts.blankToNull(reason);`
+- RequestService.java:54 (razlog zahtjeva): `String reason = Texts.blankToNull(command.reason());`
+- ApprovalController.java:68 (komentar odbijanja): `record RejectBody(@NotBlank @Size(max = 500) String comment)` i ApprovalController.java:43-45 (prazno tijelo daje "comment must not be blank").
+- AuthController.java:39 (prijava): `record LoginRequest(@NotBlank String username, @NotBlank String password)`.
+- Frontend: ApprovalsScreen.tsx:124, 131, 187 i MyTimeOffScreen.tsx:114 šalju prazni tekst kao "" (bez provjere).
+
+Odgovor na pitanje: komentar odobrenja, komentar odbijanja i razlog otkazivanja ne rade isto. Odobrenje i otkazivanje pretvore prazan tekst u null, a odbijanje ga odbije s greškom 400 (provjera je u kontroleru, ne u servisu).
+
+**L8-1 (SITNO)** Komentar odbijanja se ne pretvara u null niti se provjerava u servisu. Servis se oslanja na to da kontroler već odbije prazan tekst. Ako drugi ulaz pozove servis izravno, prazan komentar bi se spremio.
+- Za: developer.
+- Dokaz: backend/src/main/java/com/example/timeoff/service/ApprovalService.java:52, redak 52: `// The comment is required (R5); the API has already rejected a blank one.`
+- Dokaz: ApprovalService.java:59, redak 59: `request.reject(actor, comment, now);` (bez blankToNull, za razliku od redaka 44 i 47)
+- Kirurški refaktor: u reject dodati `String decisionComment = Texts.blankToNull(comment);` i provjeru `if (decisionComment == null) throw new InvalidRequestException("comment must not be blank");`.
+
+**L8-2 (VAŽNO)** Stupac "Comment" na ekranu Moja odsustva prikazuje komentar odobrenja, pa razlog otkazivanja nije vidljiv kad je zahtjev prvo odobren s komentarom pa otkazan. Operator `??` uzima prvi neprazan, a ne onaj koji odgovara statusu.
+- Za: frontend (korisnik ne vidi razlog otkazivanja).
+- Dokaz: frontend/src/components/MyTimeOffScreen.tsx:33, redak 33: `return request.decisionComment ?? request.cancelReason ?? "";`
+- Dokaz: backend/src/main/java/com/example/timeoff/domain/TimeOffRequest.java:117-119 (approve upisuje decisionComment, a cancel upisuje cancelReason zasebno, pa oba mogu biti postavljena).
+- Kirurški refaktor: za status CANCELLED vratiti cancelReason, inače decisionComment, npr. `request.status === "CANCELLED" ? request.cancelReason ?? "" : request.decisionComment ?? ""`. Ili prikazati oba.
+
+**L8-3 (SITNO)** Nigdje se tekst ne obrezuje (trim). Komentar "  ok  " se sprema s razmacima, a samo-razmakni tekst postaje null. Nema greške, ali je prikaz nedosljedan.
+- Za: developer (odluka je li potrebno obrezivanje).
+- Dokaz: backend/src/main/java/com/example/timeoff/service/Texts.java:10-14, redak 14: `return text;` (vraća tekst kakav je došao)
+- Kirurški refaktor: u blankToNull vratiti `text.strip()` nakon provjere, ako se želi jedinstveno spremanje.
+
+## Sažetak
+- Leća 6: 4 nalaza (L6-1 do L6-4), od toga 2 VAŽNO (L6-1, L6-2).
+- Leća 8: 3 nalaza (L8-1 do L8-3), od toga 1 VAŽNO (L8-2).
+
+===== 7-9.md =====
+# Leće 7 i 9: mrtav kod i komentari prema kodu
+
+Opseg: backend/src/main (java + resources/db/migration) i frontend/src. Testovi se pretražuju samo grepom za provjeru korištenja. Pravila (R, Q, D, L) nisu provjerena protiv specifikacije; provjereno je samo tvrdi li komentar isto što kod radi.
+
+---
+
+## Leća 7. Mrtav i preširok kod
+
+### L7-1 (SITNO). Javna metoda koju nitko u main kodu ne koristi
+- Što: `TimeOffRequest.isPending()` nema poziva u main kodu; postoji samo u testu.
+- Dokaz: `backend/src/main/java/com/example/timeoff/domain/TimeOffRequest.java:81` doslovno: `    public boolean isPending() {`
+- Grep: `grep -rn "isPending" backend/src/main frontend/src` daje samo definiciju. `grep -rn "isPending" backend/src/test` daje `backend/src/test/java/com/example/timeoff/domain/TimeOffRequestTest.java:52`: `assertThat(request.isPending()).isTrue();`
+- Za: developer.
+- Refaktor: obrisati metodu i tu assertion iz testa, ili provjeru statusa napisati izravno u testu preko `getStatus()`.
+
+### L7-2 (SITNO). Public metoda koju koristi samo ista klasa i test
+- Što: `WorkingDays.isWorkingDay` je public, a koristi ga samo `count` u istoj klasi i jedan test.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/WorkingDays.java:15` doslovno: `    public boolean isWorkingDay(LocalDate date) {`; poziv u istoj klasi na `WorkingDays.java:29`: `                .filter(this::isWorkingDay)`.
+- Grep: `grep -rn "isWorkingDay" backend/src` daje još samo `backend/src/test/java/com/example/timeoff/WorkingDaysTest.java:33`.
+- Za: developer.
+- Refaktor: promijeniti u `private boolean isWorkingDay(...)`; test provjeravati kroz `count(...)`.
+
+### L7-3 (SITNO). Public metoda koju koristi ista klasa i testovi
+- Što: `BalanceService.entitlement` je public, a izvan testova se koristi samo unutar `balance()`.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/BalanceService.java:35` doslovno: `    public int entitlement(LocalDate hireDate, int year) {`; interni poziv na `BalanceService.java:56`: `        int entitlement = entitlement(user.getHireDate(), year);`
+- Grep: `grep -rn "entitlement(" backend/src` daje interni poziv i tri poziva u `backend/src/test/java/com/example/timeoff/BalanceServiceTest.java` (redovi 48, 62, 69).
+- Za: developer, tester.
+- Refaktor: ako testovi smiju ići kroz `balance()`, metodu promijeniti u `private`. Ako se testovi žele zadržati na `entitlement`, metoda ostaje public, ali to treba biti svjesna odluka.
+
+### L7-4 (SITNO). Polja u frontend tipovima koja UI nikad ne čita
+- Što: `Me.id`, `Me.username` i šest polja `TimeOffRequest` (`ownerId`, `createdAt`, `decidedById`, `decidedAt`, `cancelledById`, `cancelledAt`) nisu pročitana nigdje u frontend/src.
+- Dokaz: `frontend/src/lib/types.ts:9` doslovno: `  username: string;`; `frontend/src/lib/types.ts:25` doslovno: `  ownerId: number;`; `frontend/src/lib/types.ts:32` doslovno: `  createdAt: string;`
+- Grep: `grep -rnE "ownerId|createdAt|decidedById|decidedAt|cancelledById|cancelledAt|\.username|me\.id" frontend/src` daje hite samo u `lib/types.ts` (deklaracije).
+- Za: developer (frontend).
+- Refaktor: ukloniti ta polja iz `lib/types.ts`, osim ako ih ne traži sučelje T4 do T7 kao obvezni dio tipa.
+
+### L7-5 (SITNO). Polja u API odgovoru koje frontend ne koristi
+- Što: `RequestView` šalje šest polja koja frontend nikad ne čita, pa su u odgovoru bez korisnika.
+- Dokaz: `backend/src/main/java/com/example/timeoff/api/RequestView.java:13` doslovno: `        Long ownerId,`; isto vrijedi za `createdAt` (red 20), `decidedById` (red 22), `decidedAt` (red 24), `cancelledById` (red 26) i `cancelledAt` (red 28).
+- Grep: isti grep kao u L7-4 na `frontend/src`, bez hita na tim poljima izvan `types.ts`.
+- Napomena: ovo je ugovor s API-jem; ako ga sučelje traži, nije greška, samo je tako.
+- Za: developer, integrator (odluka o ugovoru).
+- Refaktor: ako sučelje ta polja ne traži, ukloniti ih iz `record RequestView` i iz `from(...)`.
+
+**Ukupno L7: 5 nalaza.** Provjereno i bez nalaza: sve klase CSS-a u `frontend/src/components/styles.ts` se koriste; svi exporti u `frontend/src/lib/api.ts`, `labels.ts`, `month.ts` i `session.ts` se koriste; svaki repozitorij i servisna metoda u backend/src/main ima poziv (provjereno pregledom i grepom, ne svaka metoda zasebno grepom).
+
+---
+
+## Leća 9. Komentari prema kodu
+
+### L9-1 (VAŽNO). Komentar obećava da se ne može otkriti postojanje korisnika, a kod to ne jamči
+- Što: komentar tvrdi da pozivatelj ne može doznati koja korisnička imena postoje, ali kod za nepostojećeg korisnika preskače provjeru lozinke, pa je vrijeme odgovora različito.
+- Dokaz: `backend/src/main/java/com/example/timeoff/security/AuthService.java:27` doslovno: `    // Unknown user and wrong password give the same error, so a caller cannot tell which usernames exist.` Kod `AuthService.java:31-33`: `boolean passwordMatches = found` / `.map(user -> passwordEncoder.matches(password, user.getPasswordHash()))` / `.orElse(false);`. Za nepostojećeg korisnika `matches` se ne poziva, pa BCrypt nije izvršen.
+- Za: developer.
+- Refaktor: kad korisnik ne postoji, izvršiti `passwordEncoder.matches(password, <unaprijed izračunati dummy hash>)` pa tek onda vratiti `InvalidLoginException`. Ili komentar preformulirati da ne obećava više od onoga što kod radi.
+
+### L9-2 (SITNO). Komentar tvrdi da je jedno mjesto za radni dan, a frontend ima svoju kopiju pravila
+- Što: backend komentar kaže da je WorkingDays jedino mjesto koje određuje radni dan, ali frontend ima vlastitu proviziju vikenda.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/WorkingDays.java:9` doslovno: `// The one place that decides what a working day is; holidays would be added here (D1).` Kopija u `frontend/src/lib/month.ts:39-42`: `function isWeekend(year: number, monthIndex: number, day: number): boolean {` / `const weekday = new Date(year, monthIndex, day).getDay();` / `return weekday === 0 || weekday === 6;`. Komentar u `month.ts:28` kaže: `// Monday to Friday of the month, ascending (R10: weekends are not shown).`
+- Za: developer (backend i frontend), integrator.
+- Refaktor: u komentaru u `WorkingDays.java:9` dodati da frontend `lib/month.ts` ima kopiju pravila, ili kad se dodaju praznici (D1), dodati ih i u frontend (npr. da backend u kalendaru vraća dane).
+
+### L9-3 (SITNO). Iznimka za "zahtjev ne postoji" se koristi i za korisnika
+- Što: komentar kaže da se `NotFoundException` koristi kad zahtjev ne postoji, a koristi se i za korisnika.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/NotFoundException.java:3` doslovno: `// The request does not exist (404, specification section 8).` Kod: `backend/src/main/java/com/example/timeoff/service/VisibilityService.java:84` doslovno: `                .orElseThrow(() -> new NotFoundException("User not found"));`
+- Za: developer.
+- Refaktor: promijeniti komentar u `// The requested entity (request or user) does not exist (404, specification section 8).`
+
+### L9-4 (SITNO). Iznimka za konflikt ne spominje slučaj "već je počeo"
+- Što: komentar nabraja konflikte (datum zaposlenja, preklapanje, saldo), ali `RuleViolationException` se baca i kad je zahtjev već počeo.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/RuleViolationException.java:3` doslovno: `// The request conflicts with stored data: hire date, overlap or balance (409, specification section 8).` Kod: `backend/src/main/java/com/example/timeoff/service/CancelService.java:95` doslovno: `            throw new RuleViolationException("Request has already started");`
+- Za: developer.
+- Refaktor: u komentar dodati "or already started (cancel)".
+
+### L9-5 (SITNO). Komentar kaže da ApprovalService provjerava "je li na čekanju", a to radi entitet
+- Što: komentar na klasi nabraja "is pending" kao kontrolu u ApprovalService, ali ta klasa to ne provjerava, provjerava entitet.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/ApprovalService.java:15` doslovno: `// Approves and rejects requests. Checks 3-5 from interface T5 run in that order: exists, may decide, is pending.` Isto piše i `ApprovalService.java:81`: `// The pending state (R4) is checked by the request itself when it changes (T1).` Stvarna provjera je u `backend/src/main/java/com/example/timeoff/domain/TimeOffRequest.java:110`: `        if (!status.canTransitionTo(target)) {`.
+- Za: developer.
+- Refaktor: u komentaru na `ApprovalService.java:15` napisati "exists, may decide; the pending state is checked by the request (see line 81)".
+
+### L9-6 (SITNO). Komentar kaže "lazy teams", a kod čita vođene timove
+- Što: komentar u `UserView` kaže da `teamLead` čita "lazy teams", a `isTeamLead()` čita `ledTeams`.
+- Dokaz: `backend/src/main/java/com/example/timeoff/security/UserView.java:5` doslovno: `// The <Me> body from the T2 interface; built inside a transaction because teamLead reads lazy teams.` Kod `backend/src/main/java/com/example/timeoff/domain/User.java:82-84`: `public boolean isTeamLead() {` / `return !ledTeams.isEmpty();`
+- Za: developer.
+- Refaktor: promijeniti "lazy teams" u "lazy led teams (ledTeams)".
+
+### L9-7 (SITNO). Komentar pretpostavlja pravilo Q3 koje kod ne provodi, samo ga očekuje u podacima
+- Što: komentar u `CalendarService` tvrdi da je voditelj član tima kojim vodi, a kod to ne provjerava; to je samo postavka početnih podataka.
+- Dokaz: `backend/src/main/java/com/example/timeoff/service/CalendarService.java:64` doslovno: `// An admin gets every team; others the teams they are members of (a lead is a member of the teams they lead, Q3).` Kod na `CalendarService.java:68`: `List<Team> teams = viewer.isAdmin() ? teamRepository.findAll() : List.copyOf(viewer.getTeams());`. Pravilo je samo u `backend/src/main/resources/db/migration/V2__seed.sql:18`: `-- Q3: a lead is also a member of the team they lead.`
+- Napomena: nema koda koji kreira timove, pa nema ni provjere. Ako se tim ikad unese bez voditelja u članovima, voditelj neće vidjeti tim u kalendaru.
+- Za: developer, integrator.
+- Refaktor: ili dodati provjeru pri stvaranju tima, ili u komentaru napisati da je pravilo samo u početnim podacima.
+
+### L9-8 (SITNO). Komentar iznad "Approve" tvrdi da backend vraća 400 i za odobrenje bez komentara
+- Što: komentar kaže da backend odgovara 400 kad komentar ili razlog nije unesen, ali za odobrenje bez komentara backend vraća 200.
+- Dokaz: `frontend/src/components/ApprovalsScreen.tsx:68` doslovno: `  // No check that a comment or reason is filled in: the backend answers 400 (R5, D3).` Backend: `backend/src/main/java/com/example/timeoff/api/ApprovalController.java:30` doslovno: `    // The body and the comment are optional when approving (R5).`, a `ApprovalController.java:64` je `    record ApproveBody(@Size(max = 500) String comment) {` (bez `@NotBlank`).
+- Za: developer (frontend).
+- Refaktor: komentar promijeniti u "the backend answers 400 for reject (R5) and for cancel without a needed reason (D3); approve accepts an empty comment".
+
+**Ukupno L9: 8 nalaza.** Nije provjereno: komentar `V2__seed.sql:2` ("every user's password is 'password' (BCrypt)") jer hash nije izračunat; komentar `ClockConfig.java:7` ("tests replace it with a fixed clock") je djelomično potvrđen (u testovima postoji `@Primary` konfiguracija), ali nije čitan cijeli test.
+
+---
+
+## Sažetak
+- Leća 7: 5 nalaza (VAŽNO: 0; SITNO: 5).
+- Leća 9: 8 nalaza (VAŽNO: 1, L9-1; SITNO: 7).
+
