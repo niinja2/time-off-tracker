@@ -386,13 +386,17 @@ Format:
 **Zašto:** Developer i tester se slažu; sve se slaže sa specifikacijom 7 (Vidljivost) i sučeljem T7, nema konflikta.
 **Gdje:** sučelje T7 (bez izmjena); testovi `VisibilityApiTest.java`, `CalendarApiTest.java`
 
-## L28 · riješeno (orkestrator) · T7 · specifikacija 12 (Approvals), Q16
+## L28 · riješeno · T7 · specifikacija 12 (Approvals), Q16
 
 **Problem** (developer): Specifikacija ne kaže treba li ekran Approvals uz zahtjev za godišnji pokazati saldo podnositelja (koliko mu dana ostaje). Voditelj smije vidjeti saldo članova svog tima (Q16), a endpoint za to T7 dodaje (`GET /api/users/{id}/balance`), ali specifikacija 12 za Approvals navodi samo popis zahtjeva na čekanju s odobravanjem i odbijanjem. Odluka utječe samo na frontend (T8).
 
 **Odluka:** Ekran Approvals ne pokazuje saldo podnositelja. Endpoint `GET /api/users/{id}/balance` ostaje u API-ju.
 **Zašto:** Specifikacija 12 za Approvals navodi samo popis zahtjeva na čekanju s odobravanjem i odbijanjem; 80/20. Saldo na Approvals ekranu je proširenje za README.
 **Gdje:** T8 (Approvals ekran bez salda)
+
+**Odluka vlasnika (4. 11.):** Odluka iznad vrijedi samo za Approvals. Voditelj i admin dobivaju četvrti ekran, Team requests (D18): svi zahtjevi koje smiju vidjeti, u svim stanjima (s razlogom, komentarom odluke ili razlogom otkazivanja i tko je odlučio ili otkazao), i saldo tih korisnika, s filtrom po timu kao na Team calendaru.
+**Zašto:** Brief kaže da voditelj vidi "Every request from their team, including type, reason and pending requests", a Q16 i Q17 da voditelj vidi saldo tima, a admin svih. To je dosad bilo samo u API-ju, bez ekrana (odjeljak 7 nitko nije povezao s odjeljkom 12). Kalendar se ne mijenja (Q48).
+**Gdje:** specifikacija 12 i D18; frontend (novi task), backend već ima `GET /api/requests` i `GET /api/users/{id}/balance`
 
 ## L29 · riješeno · T7 · pretpostavke
 

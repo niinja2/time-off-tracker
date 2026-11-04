@@ -37,7 +37,7 @@ Polja:
 | Početni i završni datum, oba uključiva | da | [🟦 `brief`](brief.md) |
 | Razlog | ne | [🟦 `brief`](brief.md) |
 | Stanje: Pending, Approved, Rejected, Cancelled | da | [🟦 `brief`](brief.md) |
-| Komentar odluke | samo kod odbijanja | [🟦 `R5`](brief.md#rules) |
+| Komentar odluke | obavezan kod odbijanja, neobavezan kod odobrenja | [🟦 `R5`](brief.md#rules) |
 | Tko je odlučio | uz odluku | [🟩 `Q46`](atomarna-pitanja.md#q46) |
 | Razlog otkazivanja | obavezan kad ne otkazuje vlasnik | [🟩 `Q37`](atomarna-pitanja.md#q37), [🟪 `D3`](#d3) |
 | Tko je otkazao | uz otkazivanje | [🟩 `Q30`](atomarna-pitanja.md#q30), [🟩 `Q31`](atomarna-pitanja.md#q31) |
@@ -177,6 +177,7 @@ Kolega ih je opisao u odgovorima, ali ih ne radimo u POC-u. Opisujemo ih u READM
 | <a id="d15"></a>🟪 `D15` | Admin smije odobriti vlastiti zahtjev bilo kojeg tipa | [🟩 `Q1.1`](atomarna-pitanja.md#q1-1) pitao je samo za godišnji. Jedno pravilo, bez provjere tipa |
 | <a id="d16"></a>🟪 `D16` | Seed: lozinka `password` za sve; datum zaposlenja 2020-01-01 za sve osim Toma (2026-06-01) | Specifikacija nije određivala vrijednosti. Ista lozinka je najjednostavniji način da se djeluje kao svaki korisnik ([🟦 `brief`](brief.md)); Tom pokazuje razmjerni saldo u godini zaposlenja ([🟩 `Q15`](atomarna-pitanja.md#q15)): 7 mjeseci, 12 dana |
 | <a id="d17"></a>🟪 `D17` | Voditelj i admin otkazuju tuđi odobreni zahtjev koji nije počeo kroz ekran Approvals (tablica "Approved requests", razlog obavezan) | [🟩 `Q30`](atomarna-pitanja.md#q30), [🟩 `Q31`](atomarna-pitanja.md#q31), [🟩 `Q32`](atomarna-pitanja.md#q32): naručitelj dopušta otkazivanje tuđeg zahtjeva, pa ga korisnik mora moći napraviti u aplikaciji (L39, T8.1). Otkazivanje tuđeg zahtjeva na čekanju kroz UI još nije napravljeno (samo API) |
+| <a id="d18"></a>🟪 `D18` | Voditelj i admin imaju ekran Team requests: sve zahtjeve koje smiju vidjeti, u svim stanjima, i saldo tih korisnika, s filtrom po timu | Brief: voditelj vidi "Every request from their team, including type, reason and pending requests"; [🟩 `Q16`](atomarna-pitanja.md#q16) i [🟩 `Q17`](atomarna-pitanja.md#q17): voditelj vidi saldo tima, admin svih. Odjeljak 7 to dopušta, a nijedan od tri ekrana to ne prikazuje (L28). Kalendar ostaje bez odbijenih i otkazanih ([🟩 `Q48`](atomarna-pitanja.md#q48): "inače je pretrpano"), jer je ovo popis, a ne kalendar. Backend to već ima (`GET /api/requests`, `GET /api/users/{id}/balance`) |
 
 ## 11. Odstupanja od briefa
 
@@ -186,6 +187,7 @@ Za README. Slijedimo odgovor naručitelja, a ne brief.
 | --- | --- | --- |
 | "Team lead. Leads one team." | Voditelj može voditi više timova | [🟩 `Q3`](atomarna-pitanja.md#q3) |
 | Admin: "Can see and act on everything" | Admin je zaposlenik i ima saldo | [🟩 `Q1`](atomarna-pitanja.md#q1) |
+| Admin: "Can see and act on everything" | Admin ne podnosi ni ne uređuje tuđi zahtjev; odobrava, odbija i otkazuje | [🟩 `Q29`](atomarna-pitanja.md#q29) |
 | [🟦 `R3`](brief.md#rules): "Nobody can approve or reject their own request." | Admin smije odobriti vlastiti zahtjev | [🟩 `Q1.1`](atomarna-pitanja.md#q1-1) |
 | [🟦 `R6`](brief.md#rules) i [🟦 `R7`](brief.md#rules): otkazuje samo vlasnik | Otkazuje i tko smije odobriti, uz obavezan razlog | [🟩 `Q30`](atomarna-pitanja.md#q30), [🟩 `Q31`](atomarna-pitanja.md#q31), [🟪 `D3`](#d3), [🟪 `D14`](#d14) |
 | [🟦 `R11`](brief.md#rules): 20 dana godišnje | Razmjerni saldo u godini zaposlenja | [🟩 `Q15`](atomarna-pitanja.md#q15) |
@@ -193,11 +195,12 @@ Za README. Slijedimo odgovor naručitelja, a ne brief.
 
 ## 12. Ekrani
 
-Tri ekrana iz briefa ([🟦 `brief`](brief.md)):
+Tri ekrana iz briefa ([🟦 `brief`](brief.md)) i četvrti iz pravila vidljivosti ([🟪 `D18`](#d18)):
 
 1. **My time off:** moji zahtjevi sa stanjem, forma za novi zahtjev, otkazivanje i saldo godišnjeg.
 2. **Approvals:** samo za voditelje i admine; zahtjevi na čekanju koje smiju odobriti, s odobravanjem i odbijanjem; ispod njih odobreni tuđi zahtjevi koje smiju otkazati, a nisu počeli ([🟪 `D17`](#d17)).
 3. **Team calendar:** tko je odsutan u odabranom mjesecu, po pravilima vidljivosti; popis po danima.
+4. **Team requests:** samo za voditelje i admine; svi zahtjevi koje prijavljeni smije vidjeti s detaljima, u svim stanjima: ime, tip, datumi, stanje, razlog, komentar odluke ili razlog otkazivanja, tko je odlučio ili otkazao. Ispod toga saldo tih korisnika (iskorišteno, na čekanju, preostalo). Filtar po timu kao na Team calendaru: voditelj bira među timovima koje vodi, admin među svim timovima, a "svi timovi" adminu uključuje i korisnike bez tima ([🟪 `D18`](#d18)).
 
 Kad backend odbije zahtjev, ekran prikazuje poruku greške, npr. preklapanje ili premašen saldo ([🟦 `brief`](brief.md)).
 
