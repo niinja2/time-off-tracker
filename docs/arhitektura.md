@@ -66,7 +66,7 @@ Uz to Docker Compose pokreće frontend, backend i bazu jednom naredbom.
 │   ┌──────────────────────────────────┐       │
 │   │ 3.1 Ruta                         │       │
 │   │ POST /api/requests/7/approve     │       │
-│   │ → RequestController.approve      │       │
+│   │ → ApprovalController.approve     │       │
 │   └───────────────┬──────────────────┘       │
 │   ┌───────────────▼──────────────────┐       │
 │   │ 3.2 Validacija ulaza             │──ne──► 400
@@ -105,7 +105,7 @@ Uz to Docker Compose pokreće frontend, backend i bazu jednom naredbom.
 │   ┌───────────────▼──────────────────┐       │
 │   │ 4.5 Izvrši i spremi              │       │
 │   │ request.approve(ana, "ok")       │       │
-│   │ requestRepository.save(request)  │       │
+│   │ @Transactional: JPA sam zapiše   │       │
 │   └───────────────┬──────────────────┘       │
 └───────────────────┼──────────────────────────┘
                     ▼
@@ -117,13 +117,17 @@ Uz to Docker Compose pokreće frontend, backend i bazu jednom naredbom.
 │   └──────────────────────────────────┘       │
 │   ┌──────────────────────────────────┐       │
 │   │ 5.2 User                         │       │
-│   │ ime, uloga, lozinka (hash)       │       │
+│   │ ime, lozinka (hash), admin da/ne,│       │
+│   │ datum zaposlenja, timovi,        │       │
+│   │ timovi koje vodi                 │       │
+│   │ isAdmin() isTeamLead() (vodi tim)│       │
 │   │ leads(team)  isMemberOf(team)    │       │
 │   └──────────────────────────────────┘       │
 │   ┌──────────────────────────────────┐       │
 │   │ 5.3 TimeOffRequest               │       │
 │   │ vlasnik, tip, od, do, razlog,    │       │
-│   │ stanje, komentar, tko je riješio │       │
+│   │ stanje, komentar, tko je riješio,│       │
+│   │ razlog i tko je otkazao, vremena │       │
 │   │ isSubmittedBy(user) isPending()  │       │
 │   │ overlaps(od, do)                 │       │
 │   │ approve / reject / cancel        │──ne──► 409
@@ -146,6 +150,7 @@ Uz to Docker Compose pokreće frontend, backend i bazu jednom naredbom.
 │                   'APPROVED' WHERE id = 7    │
 │   vraća Javu:   TimeOffRequest               │
 │   bez pravila                                │
+│   (sučelja su u paketu domain)               │
 └───────────────────┬──────────────────────────┘
                     │ SQL
                     ▼
@@ -183,4 +188,8 @@ POVRATAK:
 - **Servis** baca iznimku, a API je pretvara u HTTP status. Servis ne zna za HTTP.
 - **Tablice ovlasti i stanja** nabrajaju samo dopušteno. Sve ostalo je zabranjeno (403, odnosno 409).
 - **Pravila su u Javi**, ne u SQL-u. Repozitorij samo dohvaća i sprema. Kod puno podataka filtriranje bi se selilo u SQL, ali i dalje u repozitorij.
+- **Spremanje:** servis ne zove `save`. Metoda servisa je `@Transactional`, pa JPA sam zapiše promijenjeni objekt na kraju metode.
+- **Uloge:** u bazi nema stupca "uloga". Admin je zapisan (`admin` da/ne), a voditelj se izvodi: voditelj je onaj tko vodi barem jedan tim (`lead_id` u tablici `teams`).
+- **Repozitoriji** su u paketu `domain`, a security ih zove izravno (prijava i provjera da korisnik postoji). Kao sloj 6 vrijede samo po ulozi, ne po paketu.
+- **Novi ekran Team requests (D18)** ide istim tokom, samo s čitanjem: backend već ima `GET /api/requests` i `GET /api/users/{id}/balance`, pa se mijenja samo frontend.
 - **Ograničenja u bazi** postoje zbog D6 (ispravke se rade direktno u bazi SQL-om): takav SQL ne prolazi kroz naš kod. Samo jednostavna ograničenja; preklapanje i saldo ostaju u Javi.

@@ -10,7 +10,7 @@ The main deliverable is the process: several LLM agents build the code in small,
 and talk only through documents. I own the specification.
 
 **Specification first.** The brief was broken into ~75 atomic questions; the client's answers and
-the decisions D1–D17 became the [specification](docs/zajednicko/specifikacija.md). Features that would
+the decisions D1–D18 became the [specification](docs/zajednicko/specifikacija.md). Features that would
 add logic and conflicts were cut early and listed as extensions. From the spec came the
 [architecture](docs/arhitektura.md) and the [tasks](docs/taskovi.md) (T1–T9 plus T8.1, small and separate).
 The [coding rules](docs/pravila-kodiranja.md) were added separately, as my preference:
@@ -43,7 +43,7 @@ and an orchestrator that runs the rounds.
 interface sections in the same order, test names that carry the rule code (`..._R1`),
 log entries with problem, decision, why and where.
 
-**Checks:** ~530 tests (backend through a real PostgreSQL, frontend screens and API client),
+**Checks:** 568 tests at the last run (482 backend through a real PostgreSQL, 86 frontend screens and API client),
 a review after every task, and happy-path user journeys clicked through in a browser
 (5 chains, 345 checks: [scenarios](tester/e2e-scenariji.md), [report](tester/e2e-izvjestaj.md)).
 Result: 344 of 345 passed. The one failure was a wrong check in the scenario, not in the app
@@ -51,12 +51,20 @@ Result: 344 of 345 passed. The one failure was a wrong check in the scenario, no
 The journeys are written so a human can follow them by hand. This first run was done by an LLM (Haiku);
 the next step is a script (Playwright) that runs the same steps on demand or on a schedule.
 
+**External reviews after the code.** Independent LLM reviews checked the finished project:
+"shiva" against the brief, the client's answers and the specification, "integrator" the code against itself
+(duplicated rules, layers, dead code), and two consistency checks of the specification itself
+(every statement listed, then compared). All findings are in one list:
+[llm-shiva/nalazi.md](llm-shiva/nalazi.md); how each specification finding was resolved is at the bottom of
+[spec-sprega.md](llm-shiva/spec-sprega.md) and [spec-sprega2.md](llm-shiva/spec-sprega2.md).
+What they found and is not built yet is listed below under "Known gaps".
+
 Details and the role prompts: [way-of-working.md](docs/way-of-working.md).
 
 ### Who owns what
 
-- I own the specification: the brief, the client questions and the decisions D1–D17.
-- The coding log owns the code. Every implementation choice (42 entries, a few hundred assumptions)
+- I own the specification: the brief, the client questions and the decisions D1–D18.
+- The coding log owns the code. Every implementation choice (57 entries, a few hundred assumptions)
   is written there with why and where, and most were settled by the agents themselves.
   That is why the log is so detailed: it is the documentation a fresh chat or a person needs
   to change the code safely.
@@ -82,7 +90,7 @@ agents' documents (interface, log entries, test reports). Not the code.
 LLMs excel at simple tasks; as complexity grows, they pay a penalty. The whole point is to atomize
 the work and give the LLMs clear rules and constraints. So this is not one-shotting the application
 from a model: it is a step-by-step, documented process where each LLM has a simple, clear role
-that any other LLM could fill later on. It is not "trust the LLM"; it is the ~530 tests, the review,
+that any other LLM could fill later on. It is not "trust the LLM"; it is the tests, the review,
 the log and the step-by-step process.
 
 - **Software has no ground truth like ML.** The same spec has many valid implementations, and the
@@ -96,7 +104,7 @@ the log and the step-by-step process.
 
 ## Run
 
-Needs Docker.
+Needs Docker. Running the tests outside Docker also needs JDK 21 and Node.js.
 
 ```sh
 cp .env.example .env    # then set JWT_SECRET to a random string of at least 32 bytes
@@ -116,6 +124,8 @@ From the repository root (backend tests need Docker running, Testcontainers star
 (cd backend && ./mvnw test)
 (cd frontend && npm ci && npm test)
 ```
+
+On Linux or macOS run `chmod +x backend/mvnw` once first (the file is stored without the execute bit).
 
 ## Choices
 
@@ -145,7 +155,7 @@ Type the username on the login form (D10: login is a form, no user picker). The 
 | `tom` | Employee (hired 2026-06-01, so 12 vacation days in 2026) | Mobile |
 | `eva` | Admin | none |
 
-Usernames are case-sensitive. The seed has no requests (D9: seed without demo requests).
+Usernames are case-sensitive (`ana` works, `Ana` does not; open question, see Known gaps). The seed has no requests (D9: seed without demo requests).
 
 ## API
 
@@ -165,7 +175,7 @@ JWT in `Authorization: Bearer <token>`; errors are `application/problem+json` (D
 
 ## Decisions and assumptions
 
-- Decisions D1–D17: [specification](docs/zajednicko/specifikacija.md), section 10.
+- Decisions D1–D18: [specification](docs/zajednicko/specifikacija.md), section 10.
 - Deviations from the brief, based on the client's answers: section 11.
 - Assumptions made while coding: the "pretpostavke" entries in the [coding log](docs/zajednicko/coding-log.md), one per task.
 
@@ -222,10 +232,39 @@ Where each one would go is in the specification, section 9.
 - Croatian public holidays not counted as working days (working-day function).
 - A request across the year boundary stays one request, days counted per year (validation and balance).
 - Sick leave may overlap approved vacation, which then gets refunded (overlap check and balance).
-- L28: show the requester's balance on the Approvals screen (the API already has `GET /api/users/{id}/balance`).
+
+## Known gaps (decided or found, not built yet)
+
+Decided, waiting for a frontend task:
+- **Team requests screen (D18).** Leads and admins may see all requests of the people they may see,
+  in every state (including rejected with the comment), and their balances (spec section 7, Q16, Q17),
+  but today this is only in the API (`GET /api/requests`, `GET /api/users/{id}/balance`).
+  D18 adds a screen: one table (name, type, dates, status, reason, decision comment or cancel reason,
+  decided or cancelled by), a small balance table, and a team filter like the calendar.
+  The backend already has everything; only the frontend is missing.
+
+Found by the reviews (details in [llm-shiva/nalazi.md](llm-shiva/nalazi.md)):
+- A lead or admin can cancel someone else's **pending** request only through the API, not on a screen (D17);
+  on the screen they reject it instead.
+- The Cancel button is also shown on an approved request that has already started; the backend refuses it with 409.
+- Request timestamps (submitted, decided, cancelled) are returned by the API but not shown.
+- The Comment column shows the decision comment, and the cancel reason only when there is no decision comment,
+  so a request approved with a comment and then cancelled hides its cancel reason.
+- `.env.example` contains a placeholder secret long enough to pass the 32-byte check, so copying it unchanged
+  starts the app with a publicly known secret; `application.properties` has a fallback secret for runs without Compose.
+- `docs/taskovi.md` and `frontend/README.md` are out of date.
+
+Open questions for the specification owner:
+- Usernames: should login ignore upper and lower case (`Ana` = `ana`)?
+- A person in two teams appears once on the calendar, with the strongest access the viewer has
+  (as the lead of one team the viewer sees type and status). The code does this; the specification does not say it.
+- The year boundary, to plan together: a request across 31 December (Q28), carry-over (Q14),
+  and a late request for last year when last year's balance is used up.
+- Past dates are tested for vacation only; sick leave and day off have no test yet.
 
 ## What's next
 
+- The Team requests screen and the review findings above, as the next iteration.
 - The extensions above, starting with carry-over and public holidays.
 - Audit history per request and a notification to the team lead (optional extras from the brief).
-- End-to-end tests against the running Compose stack.
+- A script (Playwright) that runs the end-to-end journeys on demand; the first run was done by hand by an LLM.
