@@ -4,6 +4,17 @@ Employees request time off, team leads approve or reject it, and everyone sees w
 
 The detailed project documents are in Croatian; this README links to them.
 
+**Start here**
+- **Run:** set `JWT_SECRET` in `.env` (see [Run](#run)), `docker compose up -d --build`, then open http://localhost:3000 (users under [Seeded users](#seeded-users)).
+- **The rules in code** are decision tables, one per concern:
+  [ApprovalPolicy](backend/src/main/java/com/example/timeoff/service/ApprovalPolicy.java) (who may approve or reject),
+  [CancelPolicy](backend/src/main/java/com/example/timeoff/service/CancelPolicy.java) (who may cancel, in which state),
+  [VisibilityPolicy](backend/src/main/java/com/example/timeoff/service/VisibilityPolicy.java) (who sees what),
+  [Status](backend/src/main/java/com/example/timeoff/domain/Status.java) (allowed state changes).
+- **Balance** is computed, never stored: [BalanceService](backend/src/main/java/com/example/timeoff/service/BalanceService.java)
+  (20 days a year, prorated in the hiring year), working days in [WorkingDays](backend/src/main/java/com/example/timeoff/service/WorkingDays.java).
+- **What is missing:** [Known gaps](#known-gaps-decided-or-found-not-built-yet).
+
 ## How this was built
 
 The main deliverable is the process: several LLM agents build the code in small, separate tasks,
@@ -64,7 +75,7 @@ Details and the role prompts: [way-of-working.md](docs/way-of-working.md).
 ### Who owns what
 
 - I own the specification: the brief, the client questions and the decisions D1–D18.
-- The coding log owns the code. Every implementation choice (57 entries, a few hundred assumptions)
+- The coding log owns the code. Every implementation choice (56 entries, a few hundred assumptions)
   is written there with why and where, and most were settled by the agents themselves.
   That is why the log is so detailed: it is the documentation a fresh chat or a person needs
   to change the code safely.
